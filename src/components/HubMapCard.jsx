@@ -5,7 +5,7 @@ function HubMapCard() {
       <p className="panel-subtitle">Grouped into 7 clusters</p>
 
       <div className="map-placeholder">
-        <img src="https://github.com/21musie/Fanos/blob/main/src/assets/eth.png" alt="Ethiopia hub coverage map" className="hub-map-image" />
+        <img src="https://drive.google.com/file/d/1AlGTR984R3INRH__WzZwNvBMmtMesbPZ/view?usp=sharing" alt="Ethiopia hub coverage map" className="hub-map-image" />
       </div>
     </article>
   )
