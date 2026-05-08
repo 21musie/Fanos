@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, LabelList, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 const timelineData = [
-  { module: 'Stock on hand', vitasA: 2.0, gap: 0.5, vitasB: 5.5, sap: 2.0 },
-  { module: 'Issues', vitasA: 0.0, gap: 0.0, vitasB: 8.0, sap: 2.0 },
-  { module: 'Purchase orders', vitasA: 4.0, gap: 0.8, vitasB: 3.2, sap: 2.0 },
-  { module: 'Receive', vitasA: 3.0, gap: 0.3, vitasB: 4.7, sap: 2.0 },
-  { module: 'Avg. consumption', vitasA: 5.0, gap: 0.7, vitasB: 2.3, sap: 2.0 },
+  { module: 'Stock on hand', vitasA: 3.0, gap: 0.4, vitasB: 8.6, sap: 2.0 },
+  { module: 'Issues', vitasA: 2.5, gap: 0.0, vitasB: 9.5, sap: 2.0 },
+  { module: 'Purchase orders', vitasA: 4.1, gap: 0.5, vitasB: 7.4, sap: 2.0 },
+  { module: 'Receive', vitasA: 3.4, gap: 0.3, vitasB: 8.3, sap: 2.0 },
+  { module: 'Avg. consumption', vitasA: 5.2, gap: 0.3, vitasB: 6.5, sap: 2.0 },
 ]
 
 const hexToRgb = (hex) => {
@@ -68,33 +68,25 @@ const toVibrant = (hex) => {
 
 function DataSourceCoverageChart() {
   const [activeSeries, setActiveSeries] = useState('')
+  const [isCutoverHovered, setIsCutoverHovered] = useState(false)
   const getSeriesColor = (key, baseColor) => (activeSeries === key ? toVibrant(baseColor) : baseColor)
 
   return (
     <div>
-      <div className="chart-legend">
-        <div className="chart-legend-item">
-          <span className="chart-legend-dot" style={{ backgroundColor: '#F4A261' }} />
-          <span className="chart-legend-label">VITAS (pre-2024)</span>
-        </div>
-        <div className="chart-legend-item">
-          <span className="chart-legend-dot" style={{ backgroundColor: '#6FA8DC' }} />
-          <span className="chart-legend-label">SAP ERP (2024+)</span>
-        </div>
-        <div className="chart-legend-item">
-          <span className="chart-legend-dot chart-legend-gap" />
-          <span className="chart-legend-label">Gap (no data)</span>
-        </div>
-      </div>
-
       <ResponsiveContainer width="100%" height={320}>
-        <BarChart data={timelineData} layout="vertical" margin={{ top: 8, right: 18, left: 38, bottom: 4 }} barCategoryGap={14}>
+        <BarChart
+          data={timelineData}
+          layout="vertical"
+          margin={{ top: 24, right: 18, left: 38, bottom: 4 }}
+          barCategoryGap={14}
+          onMouseLeave={() => setIsCutoverHovered(false)}
+        >
           <CartesianGrid strokeDasharray="0" stroke="#F0F0F0" horizontal={false} />
           <XAxis
             type="number"
-            domain={[0, 10]}
-            ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
-            tickFormatter={(tick) => (2015 + tick).toString()}
+            domain={[0, 14]}
+            ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]}
+            tickFormatter={(tick) => (2012 + tick).toString()}
             tick={{ fontSize: 12, fill: '#757575' }}
             axisLine={{ stroke: '#E0E0E0' }}
             tickLine={false}
@@ -115,6 +107,24 @@ function DataSourceCoverageChart() {
               fontSize: '13px',
             }}
             formatter={(value, key) => [`${Number(value).toFixed(1)} years`, key]}
+          />
+
+          <ReferenceLine
+            x={12}
+            className={`coverage-cutover-line ${isCutoverHovered ? 'active' : ''}`}
+            stroke={isCutoverHovered ? '#1565C0' : '#8AA3BF'}
+            strokeWidth={isCutoverHovered ? 2.5 : 1.5}
+            strokeDasharray={isCutoverHovered ? '4 4' : '3 5'}
+            isFront
+            ifOverflow="visible"
+            onMouseEnter={() => setIsCutoverHovered(true)}
+            label={{
+              value: 'May 2024',
+              position: 'insideTop',
+              fill: isCutoverHovered ? '#1565C0' : '#6f7f90',
+              fontSize: isCutoverHovered ? 12 : 11,
+              fontWeight: 600,
+            }}
           />
 
           <Bar
@@ -152,6 +162,21 @@ function DataSourceCoverageChart() {
           </Bar>
         </BarChart>
       </ResponsiveContainer>
+
+      <div className="chart-legend chart-legend-bottom">
+        <div className="chart-legend-item">
+          <span className="chart-legend-dot" style={{ backgroundColor: '#F4A261' }} />
+          <span className="chart-legend-label">VITAS (pre-2024)</span>
+        </div>
+        <div className="chart-legend-item">
+          <span className="chart-legend-dot" style={{ backgroundColor: '#6FA8DC' }} />
+          <span className="chart-legend-label">SAP ERP (2024+)</span>
+        </div>
+        <div className="chart-legend-item">
+          <span className="chart-legend-dot chart-legend-gap" />
+          <span className="chart-legend-label">Gap (no data)</span>
+        </div>
+      </div>
     </div>
   )
 }

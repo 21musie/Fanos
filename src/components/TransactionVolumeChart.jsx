@@ -107,18 +107,6 @@ function TransactionVolumeChart({ data, formatYAxis }) {
           onMouseLeave={() => setActiveSeries('')}
           isAnimationActive={false}
         />
-        <Bar
-          dataKey="SOH snapshots"
-          stackId="a"
-          fill={colorFor('SOH snapshots', '#B39DDB')}
-          minPointSize={12}
-          stroke="#ffffff"
-          strokeWidth={0.6}
-          radius={[4, 4, 0, 0]}
-          onMouseEnter={() => setActiveSeries('SOH snapshots')}
-          onMouseLeave={() => setActiveSeries('')}
-          isAnimationActive={false}
-        />
       </BarChart>
     </ResponsiveContainer>
   )

@@ -26,17 +26,17 @@ const defaultModuleTransactionData = [
 ]
 
 const defaultTransactionVolumeData = [
-  { year: '2015', Issues: 80000, Receive: 75000, 'Purchase Orders': 45000, 'SOH snapshots': 12000 },
-  { year: '2016', Issues: 95000, Receive: 88000, 'Purchase Orders': 52000, 'SOH snapshots': 15000 },
-  { year: '2017', Issues: 110000, Receive: 105000, 'Purchase Orders': 62000, 'SOH snapshots': 18000 },
-  { year: '2018', Issues: 145000, Receive: 138000, 'Purchase Orders': 78000, 'SOH snapshots': 22000 },
-  { year: '2019', Issues: 180000, Receive: 165000, 'Purchase Orders': 95000, 'SOH snapshots': 28000 },
-  { year: '2020', Issues: 95000, Receive: 82000, 'Purchase Orders': 48000, 'SOH snapshots': 15000 },
-  { year: '2021', Issues: 195000, Receive: 185000, 'Purchase Orders': 105000, 'SOH snapshots': 32000 },
-  { year: '2022', Issues: 225000, Receive: 210000, 'Purchase Orders': 125000, 'SOH snapshots': 38000 },
-  { year: '2023', Issues: 250000, Receive: 235000, 'Purchase Orders': 142000, 'SOH snapshots': 42000 },
-  { year: '2024', Issues: 275000, Receive: 258000, 'Purchase Orders': 158000, 'SOH snapshots': 48000 },
-  { year: '2025', Issues: 285000, Receive: 268000, 'Purchase Orders': 165000, 'SOH snapshots': 52000 },
+  { year: '2015', Issues: 80000, Receive: 75000, 'Purchase Orders': 45000 },
+  { year: '2016', Issues: 95000, Receive: 88000, 'Purchase Orders': 52000 },
+  { year: '2017', Issues: 110000, Receive: 105000, 'Purchase Orders': 62000 },
+  { year: '2018', Issues: 145000, Receive: 138000, 'Purchase Orders': 78000 },
+  { year: '2019', Issues: 180000, Receive: 165000, 'Purchase Orders': 95000 },
+  { year: '2020', Issues: 95000, Receive: 82000, 'Purchase Orders': 48000 },
+  { year: '2021', Issues: 195000, Receive: 185000, 'Purchase Orders': 105000 },
+  { year: '2022', Issues: 225000, Receive: 210000, 'Purchase Orders': 125000 },
+  { year: '2023', Issues: 250000, Receive: 235000, 'Purchase Orders': 142000 },
+  { year: '2024', Issues: 275000, Receive: 258000, 'Purchase Orders': 158000 },
+  { year: '2025', Issues: 285000, Receive: 268000, 'Purchase Orders': 165000 },
 ]
 
 const formatYAxis = (value) => {
@@ -50,7 +50,6 @@ const CustomLegend = () => {
     { label: 'Issues', color: '#F4A261' },
     { label: 'Receive', color: '#6FA8DC' },
     { label: 'Purchase Orders', color: '#7DBB7D' },
-    { label: 'SOH snapshots', color: '#B39DDB' },
   ]
 
   return (
@@ -131,7 +130,8 @@ function App() {
 
             setLiveMetrics((current) => {
               const next = { ...current }
-              if (entry.key === 'facilities') next.facilities = `${Number(numericValue).toLocaleString()}+`
+              if (entry.key === 'items') next.items = `${Number(numericValue).toLocaleString()}+`
+              else if (entry.key === 'facilities') next.facilities = `${Number(numericValue).toLocaleString()}+`
               else next[entry.key] = formatCompact(Number(numericValue)) ?? current[entry.key]
               return next
             })
@@ -179,8 +179,6 @@ function App() {
       ReceiveDoc: 'Receive',
       PurchaseOrder: 'Purchase Orders',
       Requisition: 'Purchase Orders',
-      SOHSnapshot: 'SOH snapshots',
-      StockOnHand: 'SOH snapshots',
     }
 
     const loadTransactionsByYear = async () => {
@@ -202,7 +200,7 @@ function App() {
 
           const year = String(yearNum)
           if (!yearly[year]) {
-            yearly[year] = { year, Issues: 0, Receive: 0, 'Purchase Orders': 0, 'SOH snapshots': 0 }
+            yearly[year] = { year, Issues: 0, Receive: 0, 'Purchase Orders': 0 }
           }
           yearly[year][series] += count
         }
@@ -364,7 +362,7 @@ function App() {
           <SummaryCard
             label="Number of items"
             value={renderMetricValue('items')}
-            subtitle="Grouped into 7 clusters"
+            subtitle=""
             icon={<Building2 className="card-icon" />}
           />
           <SummaryCard
@@ -389,7 +387,7 @@ function App() {
 
         <section className="charts-stack">
           <article className="panel">
-            <h2>Data source coverage by module · 2015-2025</h2>
+            <h2>Data source coverage by module · 2012-2026</h2>
             <p className="panel-subtitle">All data before 2024 from VITAS - All data from 2024 onward from SAP ERP</p>
             <DataSourceCoverageChart />
           </article>
@@ -399,16 +397,7 @@ function App() {
 
             <article className="panel">
               <h2>Total transactions by module</h2>
-              <p className="panel-subtitle">Breakdown of 4.2B transactions across all modules</p>
-
-              <div className="chart-legend chart-legend-wrap">
-                {moduleTransactionData.map((item) => (
-                  <div key={item.name} className="chart-legend-item">
-                    <span className="chart-legend-dot" style={{ backgroundColor: item.color }} />
-                    <span className="chart-legend-label">{item.name}</span>
-                  </div>
-                ))}
-              </div>
+              <p className="panel-subtitle">Breakdown of {loadingMetrics.transactions ? 'live transactions' : liveMetrics.transactions} transactions across all modules</p>
 
               {isDonutLoading ? (
                 <div className="donut-loader-wrap">
@@ -417,21 +406,27 @@ function App() {
               ) : (
                 <ModuleTransactionDonut data={moduleTransactionData} formatValue={formatYAxis} />
               )}
+
+              <div className="chart-legend chart-legend-wrap chart-legend-bottom">
+                {moduleTransactionData.map((item) => (
+                  <div key={item.name} className="chart-legend-item">
+                    <span className="chart-legend-dot" style={{ backgroundColor: item.color }} />
+                    <span className="chart-legend-label">{item.name}</span>
+                  </div>
+                ))}
+              </div>
             </article>
           </section>
 
           <article className="panel">
             <h2>Transaction volume over 10 years</h2>
             <p className="panel-subtitle">Yearly transactions by module type</p>
-            <CustomLegend />
 
             <div className="transaction-chart">
               <TransactionVolumeChart data={transactionVolumeData} formatYAxis={formatYAxis} />
             </div>
 
-            <div className="data-gap-wrapper">
-              <span className="data-gap-badge">Data gap</span>
-            </div>
+            <CustomLegend />
           </article>
 
           <article className="panel">
