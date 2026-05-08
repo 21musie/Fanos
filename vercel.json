@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://epss-pod-verification-be.onrender.com/:path*"
+    }
+  ]
+}
