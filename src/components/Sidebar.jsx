@@ -15,7 +15,7 @@ function Sidebar({ activePage, onNavigate, isOpen }) {
       <div className="sidebar-brand">
         <div className="brand-mark">F</div>
         <div>
-          <p className="brand-title">fanos</p>
+          <p className="brand-title">Fanos</p>
           <p className="brand-subtitle">Data dashboard</p>
         </div>
       </div>
