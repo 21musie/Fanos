@@ -2,7 +2,7 @@ import { BarChart3, Building, Database, FileText, LayoutGrid, Settings } from 'l
 
 const navItems = [
   { key: 'overview', label: 'Overview', icon: <LayoutGrid size={16} /> },
-  { key: 'analytics', label: 'Analytics', icon: <BarChart3 size={16} /> },
+  // { key: 'analytics', label: 'Analytics', icon: <BarChart3 size={16} /> },
   { key: 'data-sources', label: 'Data metadata & status', icon: <Database size={16} /> },
   { key: 'facilities', label: 'Facilities', icon: <Building size={16} /> },
   { key: 'reports', label: 'Reports', icon: <FileText size={16} /> },

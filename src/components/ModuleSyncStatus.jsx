@@ -1,11 +1,4 @@
-const modules = [
-  { module: 'Stock on hand', status: 'Live', lastSync: 'Last synced 2 hrs ago', tone: 'live' },
-  { module: 'Purchase orders', status: 'Live', lastSync: 'Last synced 8 hrs ago', tone: 'live' },
-  { module: 'Issue data', status: 'Stale', lastSync: 'Last synced 31 hrs ago', tone: 'stale' },
-  { module: 'Receive data', status: 'Critical', lastSync: 'Last synced 9 days ago', tone: 'critical' },
-]
-
-function ModuleSyncStatus() {
+function ModuleSyncStatus({ modules = [] }) {
   return (
     <div className="sync-status">
       <div className="sync-summary">
@@ -29,6 +22,9 @@ function ModuleSyncStatus() {
           <div className={`sync-pill ${item.tone}`}>
             <span className={`sync-pill-dot ${item.tone}`} />
             <span className="sync-pill-label">{item.status}</span>
+            <span className={`sync-pill-status ${item.syncStatusTone || 'stale'}`}>
+              Sync Status: {item.syncStatus || 'UNKNOWN'}
+            </span>
             <span className="sync-pill-time">{item.lastSync}</span>
           </div>
         </div>

@@ -1,14 +1,6 @@
 import { useState } from 'react'
 import { Bar, BarChart, CartesianGrid, LabelList, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
-const timelineData = [
-  { module: 'Stock on hand', vitasA: 3.0, gap: 0.4, vitasB: 8.6, sap: 2.0 },
-  { module: 'Issues', vitasA: 2.5, gap: 0.0, vitasB: 9.5, sap: 2.0 },
-  { module: 'Purchase orders', vitasA: 4.1, gap: 0.5, vitasB: 7.4, sap: 2.0 },
-  { module: 'Receive', vitasA: 3.4, gap: 0.3, vitasB: 8.3, sap: 2.0 },
-  { module: 'Avg. consumption', vitasA: 5.2, gap: 0.3, vitasB: 6.5, sap: 2.0 },
-]
-
 const hexToRgb = (hex) => {
   const clean = hex.replace('#', '')
   const num = Number.parseInt(clean, 16)
@@ -66,7 +58,7 @@ const toVibrant = (hex) => {
   return rgbToHex(vivid.r, vivid.g, vivid.b)
 }
 
-function DataSourceCoverageChart() {
+function DataSourceCoverageChart({ data = [] }) {
   const [activeSeries, setActiveSeries] = useState('')
   const [isCutoverHovered, setIsCutoverHovered] = useState(false)
   const getSeriesColor = (key, baseColor) => (activeSeries === key ? toVibrant(baseColor) : baseColor)
@@ -75,7 +67,7 @@ function DataSourceCoverageChart() {
     <div>
       <ResponsiveContainer width="100%" height={320}>
         <BarChart
-          data={timelineData}
+          data={data}
           layout="vertical"
           margin={{ top: 24, right: 18, left: 38, bottom: 4 }}
           barCategoryGap={14}
@@ -127,28 +119,20 @@ function DataSourceCoverageChart() {
             }}
           />
 
+          <Bar dataKey="offset" stackId="coverage" fill="rgba(0,0,0,0)" isAnimationActive={false} />
+
           <Bar
-            dataKey="vitasA"
+            dataKey="vitas"
             stackId="coverage"
-            fill={getSeriesColor('vitasA', '#F4A261')}
+            fill={getSeriesColor('vitas', '#F4A261')}
             radius={[2, 0, 0, 2]}
-            onMouseEnter={() => setActiveSeries('vitasA')}
+            onMouseEnter={() => setActiveSeries('vitas')}
             onMouseLeave={() => setActiveSeries('')}
             isAnimationActive={false}
           >
-            <LabelList dataKey="vitasA" position="inside" formatter={(v) => (Number(v) >= 1.5 ? 'VITAS' : '')} fill="#fff" fontSize={10} />
+            <LabelList dataKey="vitas" position="inside" formatter={(v) => (Number(v) >= 1.5 ? 'VITAS' : '')} fill="#fff" fontSize={10} />
           </Bar>
           <Bar dataKey="gap" stackId="coverage" fill="#EAEAEA" isAnimationActive={false} />
-          <Bar
-            dataKey="vitasB"
-            stackId="coverage"
-            fill={getSeriesColor('vitasB', '#F4A261')}
-            onMouseEnter={() => setActiveSeries('vitasB')}
-            onMouseLeave={() => setActiveSeries('')}
-            isAnimationActive={false}
-          >
-            <LabelList dataKey="vitasB" position="inside" formatter={(v) => (Number(v) >= 1.5 ? 'VITAS' : '')} fill="#fff" fontSize={10} />
-          </Bar>
           <Bar
             dataKey="sap"
             stackId="coverage"

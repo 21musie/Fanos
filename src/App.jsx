@@ -39,6 +39,21 @@ const defaultTransactionVolumeData = [
   { year: '2025', Issues: 285000, Receive: 268000, 'Purchase Orders': 165000 },
 ]
 
+const defaultSyncStatusData = [
+  { module: 'IssueDoc', status: 'Live', lastSync: 'Last synced 2 hrs ago', tone: 'live' },
+  { module: 'PurchaseOrder', status: 'Live', lastSync: 'Last synced 8 hrs ago', tone: 'live' },
+  { module: 'ReceiveDoc', status: 'Stale', lastSync: 'Last synced 31 hrs ago', tone: 'stale' },
+  { module: 'OutboundDelivery2', status: 'Critical', lastSync: 'Last synced 9 days ago', tone: 'critical' },
+]
+
+const defaultCoverageData = [
+  { module: 'Issues', offset: 0, vitas: 12, gap: 0, sap: 2 },
+  { module: 'Purchase orders', offset: 1, vitas: 11, gap: 0, sap: 2 },
+  { module: 'Receive', offset: 2, vitas: 10, gap: 0, sap: 2 },
+  { module: 'Requisition', offset: 3, vitas: 9, gap: 0, sap: 2 },
+  { module: 'Invoice', offset: 0, vitas: 12, gap: 0, sap: 0 },
+]
+
 const formatYAxis = (value) => {
   if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
   if (value >= 1000) return `${Math.round(value / 1000)}K`
@@ -67,13 +82,17 @@ const CustomLegend = () => {
 function App() {
   const [activePage, setActivePage] = useState('overview')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [moduleTransactionData, setModuleTransactionData] = useState(defaultModuleTransactionData)
+  const [isAppLoading, setIsAppLoading] = useState(true)
+  const [moduleTransactionData, setModuleTransactionData] = useState([])
   const [transactionVolumeData, setTransactionVolumeData] = useState(defaultTransactionVolumeData)
+  const [syncStatusData, setSyncStatusData] = useState([])
+  const [coverageData, setCoverageData] = useState(defaultCoverageData)
   const [isDonutLoading, setIsDonutLoading] = useState(true)
+  const [isSyncStatusLoading, setIsSyncStatusLoading] = useState(true)
   const [liveMetrics, setLiveMetrics] = useState({
-    items: '19',
-    transactions: '4.2B',
-    facilities: '4,000+',
+    items: '',
+    transactions: '',
+    facilities: '',
   })
   const [loadingMetrics, setLoadingMetrics] = useState({
     items: true,
@@ -109,7 +128,33 @@ function App() {
   }
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setIsAppLoading(false)
+    }, 5000)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [])
+
+  useEffect(() => {
     let isMounted = true
+    const wait = (ms) => new Promise((resolve) => {
+      window.setTimeout(resolve, ms)
+    })
+    const fetchJsonWithRetry = async (url, retryDelayMs = 3000) => {
+      while (isMounted) {
+        try {
+          const response = await fetch(url)
+          if (!response.ok) throw new Error(`Request failed: ${url}`)
+          return await response.json()
+        } catch {
+          if (!isMounted) break
+          await wait(retryDelayMs)
+        }
+      }
+      return null
+    }
 
     const loadLiveMetrics = async () => {
       const endpoints = [
@@ -120,13 +165,14 @@ function App() {
 
       await Promise.allSettled(
         endpoints.map(async (entry) => {
-          try {
-            const response = await fetch(entry.url)
-            if (!response.ok) throw new Error(`Request failed: ${entry.url}`)
-            const json = await response.json()
+          while (isMounted) {
+            const json = await fetchJsonWithRetry(entry.url)
+            if (!json || !isMounted) return
             const numericValue = extractFirstNumber(json)
-            if (numericValue === null) throw new Error(`No numeric value in ${entry.url}`)
-            if (!isMounted) return
+            if (numericValue === null) {
+              await wait(1500)
+              continue
+            }
 
             setLiveMetrics((current) => {
               const next = { ...current }
@@ -135,8 +181,8 @@ function App() {
               else next[entry.key] = formatCompact(Number(numericValue)) ?? current[entry.key]
               return next
             })
-          } finally {
             if (isMounted) setLoadingMetrics((current) => ({ ...current, [entry.key]: false }))
+            return
           }
         }),
       )
@@ -152,11 +198,13 @@ function App() {
     }
 
     const loadModuleTransactions = async () => {
-      try {
-        const response = await fetch(apiUrl('/metadata/transactions/by-module'))
-        if (!response.ok) throw new Error('Failed to load module transactions')
-        const payload = await response.json()
-        if (!Array.isArray(payload) || payload.length === 0) return
+      while (isMounted) {
+        const payload = await fetchJsonWithRetry(apiUrl('/metadata/transactions/by-module'))
+        if (!payload || !isMounted) return
+        if (!Array.isArray(payload) || payload.length === 0) {
+          await wait(1500)
+          continue
+        }
 
         const mapped = payload
           .filter((item) => typeof item?.numberOfTransactions === 'number' && Number.isFinite(item.numberOfTransactions))
@@ -166,11 +214,16 @@ function App() {
             color: moduleColors[index % moduleColors.length],
           }))
 
-        if (isMounted && mapped.length > 0) setModuleTransactionData(mapped)
-      } catch {
-        // Keep default chart values on API failure.
-      } finally {
-        if (isMounted) setIsDonutLoading(false)
+        if (mapped.length === 0) {
+          await wait(1500)
+          continue
+        }
+
+        if (isMounted) {
+          setModuleTransactionData(mapped)
+          setIsDonutLoading(false)
+        }
+        return
       }
     }
 
@@ -182,12 +235,14 @@ function App() {
     }
 
     const loadTransactionsByYear = async () => {
-      try {
-        const response = await fetch(apiUrl('/metadata/transactions/by-year'))
-        if (!response.ok) throw new Error('Failed to load yearly transactions')
-        const payload = await response.json()
+      while (isMounted) {
+        const payload = await fetchJsonWithRetry(apiUrl('/metadata/transactions/by-module-by-year'))
+        if (!payload || !isMounted) return
         const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.value) ? payload.value : []
-        if (!Array.isArray(rows) || rows.length === 0) return
+        if (!Array.isArray(rows) || rows.length === 0) {
+          await wait(1500)
+          continue
+        }
 
         const yearly = {}
         for (const row of rows) {
@@ -206,17 +261,176 @@ function App() {
         }
 
         const mapped = Object.values(yearly).sort((a, b) => Number(a.year) - Number(b.year))
-        if (isMounted && mapped.length > 0) setTransactionVolumeData(mapped)
-      } catch {
-        // Keep default static series when endpoint fails.
+        if (mapped.length === 0) {
+          await wait(1500)
+          continue
+        }
+        if (isMounted) setTransactionVolumeData(mapped)
+        return
       }
     }
 
-    loadLiveMetrics().catch(() => {
-      // Keep fallback values already shown in cards.
-    })
-    loadModuleTransactions()
-    loadTransactionsByYear()
+    const loadCoverageByYear = async () => {
+      while (isMounted) {
+        const payload = await fetchJsonWithRetry(apiUrl('/metadata/transactions/by-year'))
+        if (!payload || !isMounted) return
+        const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.value) ? payload.value : []
+        if (!Array.isArray(rows) || rows.length === 0) {
+          await wait(1500)
+          continue
+        }
+
+        const labelMap = {
+          IssueDoc: 'Issues',
+          ReceiveDoc: 'Receive',
+          PurchaseOrder: 'Purchase orders',
+          Requisition: 'Requisition',
+          Invoice: 'Invoice',
+          StockOnHand: 'Stock on hand',
+          SOHSnapshot: 'Stock on hand',
+        }
+
+        const rangeStart = 2012
+        const sapStart = 2024
+        const rangeEnd = 2026
+
+        const aggregate = new Map()
+        for (const row of rows) {
+          const year = Number(row?.transactionYear)
+          const count = Number(row?.transactionCount)
+          if (!Number.isFinite(year) || !Number.isFinite(count) || year < rangeStart || year > rangeEnd || count <= 0) continue
+
+          const moduleLabel = labelMap[row?.module] ?? String(row?.module || 'Unknown')
+          if (!aggregate.has(moduleLabel)) {
+            aggregate.set(moduleLabel, {
+              module: moduleLabel,
+              total: 0,
+              vitasYears: new Set(),
+              sapYears: new Set(),
+            })
+          }
+
+          const item = aggregate.get(moduleLabel)
+          item.total += count
+          if (String(row?.source || '').toLowerCase().includes('sap')) item.sapYears.add(year)
+          else item.vitasYears.add(year)
+        }
+
+        const mapped = [...aggregate.values()]
+          .map((item) => {
+            const vitasYears = [...item.vitasYears]
+            const sapYears = [...item.sapYears]
+
+            const preCutoverYears = vitasYears.filter((y) => y <= sapStart)
+            const hasVitas = preCutoverYears.length > 0
+            const hasSAP = sapYears.length > 0
+
+            const vitasStart = hasVitas ? Math.min(...preCutoverYears) : rangeStart
+            const vitasEndExclusive = hasVitas ? Math.min(sapStart, Math.max(...preCutoverYears) + 1) : rangeStart
+
+            const offset = Math.max(0, vitasStart - rangeStart)
+            const vitas = Math.max(0, vitasEndExclusive - vitasStart)
+            const gap = Math.max(0, sapStart - vitasEndExclusive)
+            const sap = hasSAP ? Math.max(0, rangeEnd - sapStart) : 0
+
+            return {
+              module: item.module,
+              offset,
+              vitas,
+              gap,
+              sap,
+              total: item.total,
+            }
+          })
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 6)
+          .map(({ total, ...row }) => row)
+
+        if (mapped.length === 0) {
+          await wait(1500)
+          continue
+        }
+        if (isMounted) setCoverageData(mapped)
+        return
+      }
+    }
+
+    const toSyncTone = (hoursSince) => {
+      const hours = Number(hoursSince)
+      if (Number.isFinite(hours) && hours >= 24 * 7) return 'critical'
+      if (Number.isFinite(hours) && hours > 24) return 'stale'
+      return 'live'
+    }
+
+    const toSyncStatusTone = (syncStatus) => {
+      const status = String(syncStatus || '').toUpperCase()
+      if (status === 'FAILED') return 'critical'
+      if (status === 'IMPORTED') return 'live'
+      return 'stale'
+    }
+
+    const toSyncLabel = (tone) => {
+      if (tone === 'critical') return 'Critical'
+      if (tone === 'stale') return 'Stale'
+      return 'Live'
+    }
+
+    const formatLastSync = (hoursSince) => {
+      const hours = Number(hoursSince)
+      if (!Number.isFinite(hours)) return 'Last synced unknown'
+      if (hours < 24) return `Last synced ${Math.max(1, Math.round(hours))} hrs ago`
+      const days = Math.round(hours / 24)
+      return `Last synced ${days} day${days === 1 ? '' : 's'} ago`
+    }
+
+    const loadSyncStatus = async () => {
+      while (isMounted) {
+        const payload = await fetchJsonWithRetry(apiUrl('/metadata/sync-status'))
+        if (!payload || !isMounted) return
+        const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.value) ? payload.value : []
+        if (!Array.isArray(rows) || rows.length === 0) {
+          await wait(1500)
+          continue
+        }
+
+        const mapped = rows
+          .map((row) => {
+            const tone = toSyncTone(row?.hoursSince)
+            const hoursSince = Number(row?.hoursSince)
+            const syncStatusRaw = String(row?.syncStatus || 'UNKNOWN').toUpperCase()
+            return {
+              module: String(row?.module || 'Unknown').trim(),
+              status: toSyncLabel(tone),
+              lastSync: formatLastSync(row?.hoursSince),
+              tone,
+              syncStatus: syncStatusRaw,
+              syncStatusTone: toSyncStatusTone(syncStatusRaw),
+              hoursSince: Number.isFinite(hoursSince) ? hoursSince : Number.MAX_SAFE_INTEGER,
+            }
+          })
+          .sort((a, b) => a.hoursSince - b.hoursSince)
+          .map(({ hoursSince, ...item }) => item)
+
+        if (mapped.length === 0) {
+          await wait(1500)
+          continue
+        }
+        if (isMounted) {
+          setSyncStatusData(mapped)
+          setIsSyncStatusLoading(false)
+        }
+        return
+      }
+    }
+
+    // Fire all dashboard API requests immediately while splash screen is visible.
+    void Promise.all([
+      loadLiveMetrics(),
+      loadModuleTransactions(),
+      loadTransactionsByYear(),
+      loadCoverageByYear(),
+      loadSyncStatus(),
+    ])
 
     return () => {
       isMounted = false
@@ -231,6 +445,22 @@ function App() {
   const handleNavigate = (page) => {
     setActivePage(page)
     setIsSidebarOpen(false)
+  }
+
+  if (isAppLoading) {
+    return (
+      <div className="app-loader-screen" role="status" aria-live="polite" aria-label="Loading dashboard">
+        <div className="app-loader-content">
+          <div className="app-loader-orbit">
+            <span className="app-loader-core" />
+            <span className="app-loader-ring app-loader-ring-one" />
+            <span className="app-loader-ring app-loader-ring-two" />
+          </div>
+          <h1>Fanos Dashboard</h1>
+          <p>Preparing your data experience...</p>
+        </div>
+      </div>
+    )
   }
 
   const renderPageContent = () => {
@@ -389,7 +619,7 @@ function App() {
           <article className="panel">
             <h2>Data source coverage by module · 2012-2026</h2>
             <p className="panel-subtitle">All data before 2024 from VITAS - All data from 2024 onward from SAP ERP</p>
-            <DataSourceCoverageChart />
+            <DataSourceCoverageChart data={coverageData} />
           </article>
 
           <section className="dual-panel-grid">
@@ -425,14 +655,19 @@ function App() {
             <div className="transaction-chart">
               <TransactionVolumeChart data={transactionVolumeData} formatYAxis={formatYAxis} />
             </div>
-
             <CustomLegend />
           </article>
 
           <article className="panel">
             <h2>Module sync status</h2>
             <p className="panel-subtitle">Current feed health by data module · as of last dashboard refresh</p>
-            <ModuleSyncStatus />
+            {isSyncStatusLoading ? (
+              <div className="donut-loader-wrap">
+                <span className="donut-loader" aria-label="Loading sync status" />
+              </div>
+            ) : (
+              <ModuleSyncStatus modules={syncStatusData} />
+            )}
           </article>
         </section>
       </>
@@ -449,7 +684,7 @@ function App() {
             <button type="button" className="menu-button" onClick={() => setIsSidebarOpen((prev) => !prev)} aria-label="Toggle navigation">
               {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-            <p>fanos</p>
+            <p>Fanos</p>
           </div>
           {renderPageContent()}
         </div>
