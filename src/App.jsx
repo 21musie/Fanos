@@ -14,6 +14,7 @@ import ModuleSyncStatus from './components/ModuleSyncStatus'
 import HubMapCard from './components/HubMapCard'
 import ModuleTransactionDonut from './components/ModuleTransactionDonut'
 import TransactionVolumeChart from './components/TransactionVolumeChart'
+import { apiUrl } from './config'
 import './App.css'
 
 const defaultModuleTransactionData = [
@@ -112,9 +113,9 @@ function App() {
 
     const loadLiveMetrics = async () => {
       const endpoints = [
-        { key: 'items', url: 'https://epss-pod-verification-be.onrender.com/metadata/served-item-units' },
-        { key: 'transactions', url: 'https://epss-pod-verification-be.onrender.com/metadata/transactions' },
-        { key: 'facilities', url: 'https://epss-pod-verification-be.onrender.com/metadata/served-facilities' },
+        { key: 'items', url: apiUrl('/metadata/served-item-units') },
+        { key: 'transactions', url: apiUrl('/metadata/transactions') },
+        { key: 'facilities', url: apiUrl('/metadata/served-facilities') },
       ]
 
       await Promise.allSettled(
@@ -151,7 +152,7 @@ function App() {
 
     const loadModuleTransactions = async () => {
       try {
-        const response = await fetch('https://epss-pod-verification-be.onrender.com/metadata/transactions/by-module')
+        const response = await fetch(apiUrl('/metadata/transactions/by-module'))
         if (!response.ok) throw new Error('Failed to load module transactions')
         const payload = await response.json()
         if (!Array.isArray(payload) || payload.length === 0) return

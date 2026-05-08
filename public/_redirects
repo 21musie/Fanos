@@ -1,0 +1,6 @@
+# Netlify: proxy API under same origin so the browser does not hit CORS.
+# Set build env: VITE_API_ORIGIN=/api
+# Then requests go to /api/metadata/... and Netlify forwards to Render.
+/api/*  https://epss-pod-verification-be.onrender.com/:splat  200
+# SPA fallback (keep client-side routes working)
+/*    /index.html   200
