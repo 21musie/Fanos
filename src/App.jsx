@@ -25,7 +25,7 @@ const defaultModuleTransactionData = [
   { name: 'Avg. consumption', value: 380000, color: '#F6B26B' },
 ]
 
-const transactionVolumeData = [
+const defaultTransactionVolumeData = [
   { year: '2015', Issues: 80000, Receive: 75000, 'Purchase Orders': 45000, 'SOH snapshots': 12000 },
   { year: '2016', Issues: 95000, Receive: 88000, 'Purchase Orders': 52000, 'SOH snapshots': 15000 },
   { year: '2017', Issues: 110000, Receive: 105000, 'Purchase Orders': 62000, 'SOH snapshots': 18000 },
@@ -69,6 +69,7 @@ function App() {
   const [activePage, setActivePage] = useState('overview')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [moduleTransactionData, setModuleTransactionData] = useState(defaultModuleTransactionData)
+  const [transactionVolumeData, setTransactionVolumeData] = useState(defaultTransactionVolumeData)
   const [isDonutLoading, setIsDonutLoading] = useState(true)
   const [liveMetrics, setLiveMetrics] = useState({
     items: '19',
@@ -173,10 +174,51 @@ function App() {
       }
     }
 
+    const byYearSeriesMap = {
+      IssueDoc: 'Issues',
+      ReceiveDoc: 'Receive',
+      PurchaseOrder: 'Purchase Orders',
+      Requisition: 'Purchase Orders',
+      SOHSnapshot: 'SOH snapshots',
+      StockOnHand: 'SOH snapshots',
+    }
+
+    const loadTransactionsByYear = async () => {
+      try {
+        const response = await fetch(apiUrl('/metadata/transactions/by-year'))
+        if (!response.ok) throw new Error('Failed to load yearly transactions')
+        const payload = await response.json()
+        const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.value) ? payload.value : []
+        if (!Array.isArray(rows) || rows.length === 0) return
+
+        const yearly = {}
+        for (const row of rows) {
+          const yearNum = Number(row?.transactionYear)
+          const count = Number(row?.transactionCount)
+          const module = row?.module
+          const series = byYearSeriesMap[module]
+          if (!series || !Number.isFinite(yearNum) || !Number.isFinite(count)) continue
+          if (yearNum < 2015 || yearNum > 2025) continue
+
+          const year = String(yearNum)
+          if (!yearly[year]) {
+            yearly[year] = { year, Issues: 0, Receive: 0, 'Purchase Orders': 0, 'SOH snapshots': 0 }
+          }
+          yearly[year][series] += count
+        }
+
+        const mapped = Object.values(yearly).sort((a, b) => Number(a.year) - Number(b.year))
+        if (isMounted && mapped.length > 0) setTransactionVolumeData(mapped)
+      } catch {
+        // Keep default static series when endpoint fails.
+      }
+    }
+
     loadLiveMetrics().catch(() => {
       // Keep fallback values already shown in cards.
     })
     loadModuleTransactions()
+    loadTransactionsByYear()
 
     return () => {
       isMounted = false

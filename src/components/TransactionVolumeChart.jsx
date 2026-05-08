@@ -62,8 +62,8 @@ function TransactionVolumeChart({ data, formatYAxis }) {
   const colorFor = (key, base) => (activeSeries === key ? toVibrant(base) : base)
 
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 40 }} barCategoryGap="15%">
+    <ResponsiveContainer width="100%" height={340}>
+      <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 40 }} barCategoryGap="15%" barSize={72}>
         <CartesianGrid strokeDasharray="0" stroke="#F0F0F0" vertical={false} />
         <XAxis dataKey="year" tick={{ fontSize: 13, fill: '#757575' }} axisLine={{ stroke: '#E0E0E0' }} tickLine={false} />
         <YAxis tick={{ fontSize: 13, fill: '#757575' }} axisLine={false} tickLine={false} tickFormatter={formatYAxis} />
@@ -76,12 +76,33 @@ function TransactionVolumeChart({ data, formatYAxis }) {
           }}
           formatter={(value) => formatYAxis(Number(value))}
         />
-        <Bar dataKey="Issues" stackId="a" fill={colorFor('Issues', '#F4A261')} onMouseEnter={() => setActiveSeries('Issues')} onMouseLeave={() => setActiveSeries('')} isAnimationActive={false} />
-        <Bar dataKey="Receive" stackId="a" fill={colorFor('Receive', '#6FA8DC')} onMouseEnter={() => setActiveSeries('Receive')} onMouseLeave={() => setActiveSeries('')} isAnimationActive={false} />
+        <Bar
+          dataKey="Issues"
+          stackId="a"
+          fill={colorFor('Issues', '#F4A261')}
+          stroke="#ffffff"
+          strokeWidth={0.6}
+          onMouseEnter={() => setActiveSeries('Issues')}
+          onMouseLeave={() => setActiveSeries('')}
+          isAnimationActive={false}
+        />
+        <Bar
+          dataKey="Receive"
+          stackId="a"
+          fill={colorFor('Receive', '#6FA8DC')}
+          minPointSize={10}
+          stroke="#ffffff"
+          strokeWidth={0.6}
+          onMouseEnter={() => setActiveSeries('Receive')}
+          onMouseLeave={() => setActiveSeries('')}
+          isAnimationActive={false}
+        />
         <Bar
           dataKey="Purchase Orders"
           stackId="a"
           fill={colorFor('Purchase Orders', '#7DBB7D')}
+          stroke="#ffffff"
+          strokeWidth={0.6}
           onMouseEnter={() => setActiveSeries('Purchase Orders')}
           onMouseLeave={() => setActiveSeries('')}
           isAnimationActive={false}
@@ -90,6 +111,9 @@ function TransactionVolumeChart({ data, formatYAxis }) {
           dataKey="SOH snapshots"
           stackId="a"
           fill={colorFor('SOH snapshots', '#B39DDB')}
+          minPointSize={12}
+          stroke="#ffffff"
+          strokeWidth={0.6}
           radius={[4, 4, 0, 0]}
           onMouseEnter={() => setActiveSeries('SOH snapshots')}
           onMouseLeave={() => setActiveSeries('')}
