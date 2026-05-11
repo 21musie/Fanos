@@ -231,14 +231,20 @@ function App() {
       IssueDoc: 'Issues',
       ReceiveDoc: 'Receive',
       PurchaseOrder: 'Purchase Orders',
-      Requisition: 'Purchase Orders',
     }
 
     const loadTransactionsByYear = async () => {
+      const currentCalendarYear = new Date().getFullYear()
       while (isMounted) {
         const payload = await fetchJsonWithRetry(apiUrl('/metadata/transactions/by-module-by-year'))
         if (!payload || !isMounted) return
-        const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.value) ? payload.value : []
+        const rows = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.value)
+            ? payload.value
+            : payload && typeof payload === 'object'
+              ? [payload]
+              : []
         if (!Array.isArray(rows) || rows.length === 0) {
           await wait(1500)
           continue
@@ -248,10 +254,10 @@ function App() {
         for (const row of rows) {
           const yearNum = Number(row?.transactionYear)
           const count = Number(row?.transactionCount)
-          const module = row?.module
-          const series = byYearSeriesMap[module]
+          const moduleName = String(row?.module || '').trim()
+          const series = byYearSeriesMap[moduleName]
           if (!series || !Number.isFinite(yearNum) || !Number.isFinite(count)) continue
-          if (yearNum < 2015 || yearNum > 2025) continue
+          if (yearNum < 2012 || yearNum > currentCalendarYear) continue
 
           const year = String(yearNum)
           if (!yearly[year]) {
@@ -597,8 +603,8 @@ function App() {
           />
           <SummaryCard
             label="Data coverage"
-            value="10+ years"
-            subtitle="2015 - 2025"
+            value="12+ years"
+            subtitle="2012 - 2025"
             icon={<Calendar className="card-icon" />}
           />
           <SummaryCard
@@ -649,7 +655,7 @@ function App() {
           </section>
 
           <article className="panel">
-            <h2>Transaction volume over 10 years</h2>
+            <h2>Transaction volume over 12 years</h2>
             <p className="panel-subtitle">Yearly transactions by module type</p>
 
             <div className="transaction-chart">

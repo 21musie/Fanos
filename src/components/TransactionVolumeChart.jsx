@@ -63,7 +63,7 @@ function TransactionVolumeChart({ data, formatYAxis }) {
 
   return (
     <ResponsiveContainer width="100%" height={340}>
-      <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 40 }} barCategoryGap="15%" barSize={72}>
+      <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 40 }} barCategoryGap="15%" barSize={64}>
         <CartesianGrid strokeDasharray="0" stroke="#F0F0F0" vertical={false} />
         <XAxis dataKey="year" tick={{ fontSize: 13, fill: '#757575' }} axisLine={{ stroke: '#E0E0E0' }} tickLine={false} />
         <YAxis tick={{ fontSize: 13, fill: '#757575' }} axisLine={false} tickLine={false} tickFormatter={formatYAxis} />
@@ -87,6 +87,16 @@ function TransactionVolumeChart({ data, formatYAxis }) {
           isAnimationActive={false}
         />
         <Bar
+          dataKey="Purchase Orders"
+          stackId="a"
+          fill={colorFor('Purchase Orders', '#7DBB7D')}
+          stroke="#ffffff"
+          strokeWidth={0.6}
+          onMouseEnter={() => setActiveSeries('Purchase Orders')}
+          onMouseLeave={() => setActiveSeries('')}
+          isAnimationActive={false}
+        />
+        <Bar
           dataKey="Receive"
           stackId="a"
           fill={colorFor('Receive', '#6FA8DC')}
@@ -94,16 +104,6 @@ function TransactionVolumeChart({ data, formatYAxis }) {
           stroke="#ffffff"
           strokeWidth={0.6}
           onMouseEnter={() => setActiveSeries('Receive')}
-          onMouseLeave={() => setActiveSeries('')}
-          isAnimationActive={false}
-        />
-        <Bar
-          dataKey="Purchase Orders"
-          stackId="a"
-          fill={colorFor('Purchase Orders', '#7DBB7D')}
-          stroke="#ffffff"
-          strokeWidth={0.6}
-          onMouseEnter={() => setActiveSeries('Purchase Orders')}
           onMouseLeave={() => setActiveSeries('')}
           isAnimationActive={false}
         />
