@@ -1,12 +1,9 @@
-import { BarChart3, Building, Database, FileText, LayoutGrid, Settings } from 'lucide-react'
+import { LayoutGrid } from 'lucide-react'
 
 const navItems = [
   { key: 'overview', label: 'Overview', icon: <LayoutGrid size={16} /> },
-  // { key: 'analytics', label: 'Analytics', icon: <BarChart3 size={16} /> },
-  { key: 'data-sources', label: 'Data metadata & status', icon: <Database size={16} /> },
-  { key: 'facilities', label: 'Facilities', icon: <Building size={16} /> },
-  { key: 'reports', label: 'Reports', icon: <FileText size={16} /> },
-  { key: 'settings', label: 'Settings', icon: <Settings size={16} /> },
+  { key: 'issues', label: 'Issues', icon: <LayoutGrid size={16} /> },
+  { key: 'receives', label: 'Receives', icon: <LayoutGrid size={16} /> },
 ]
 
 function Sidebar({ activePage, onNavigate, isOpen }) {

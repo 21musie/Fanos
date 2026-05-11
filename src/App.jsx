@@ -94,6 +94,10 @@ function App() {
     transactions: '',
     facilities: '',
   })
+  const [itemSlides, setItemSlides] = useState([])
+  const [itemSlideIndex, setItemSlideIndex] = useState(0)
+  const [facilitySlides, setFacilitySlides] = useState([])
+  const [facilitySlideIndex, setFacilitySlideIndex] = useState(0)
   const [loadingMetrics, setLoadingMetrics] = useState({
     items: true,
     transactions: true,
@@ -158,9 +162,7 @@ function App() {
 
     const loadLiveMetrics = async () => {
       const endpoints = [
-        { key: 'items', url: apiUrl('/metadata/served-item-units') },
         { key: 'transactions', url: apiUrl('/metadata/transactions') },
-        { key: 'facilities', url: apiUrl('/metadata/served-facilities') },
       ]
 
       await Promise.allSettled(
@@ -176,9 +178,7 @@ function App() {
 
             setLiveMetrics((current) => {
               const next = { ...current }
-              if (entry.key === 'items') next.items = `${Number(numericValue).toLocaleString()}+`
-              else if (entry.key === 'facilities') next.facilities = `${Number(numericValue).toLocaleString()}+`
-              else next[entry.key] = formatCompact(Number(numericValue)) ?? current[entry.key]
+              next[entry.key] = formatCompact(Number(numericValue)) ?? current[entry.key]
               return next
             })
             if (isMounted) setLoadingMetrics((current) => ({ ...current, [entry.key]: false }))
@@ -186,6 +186,96 @@ function App() {
           }
         }),
       )
+    }
+
+    const loadItemSlides = async () => {
+      while (isMounted) {
+        const payload = await fetchJsonWithRetry(apiUrl('/metadata/served-item-units/by-commodity-type'))
+        if (!payload || !isMounted) return
+        const rows = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.value)
+            ? payload.value
+            : payload && typeof payload === 'object'
+              ? [payload]
+              : []
+
+        if (!Array.isArray(rows) || rows.length === 0) {
+          await wait(1500)
+          continue
+        }
+
+        const mapped = rows
+          .map((row) => {
+            const type = String(row?.commodityType ?? row?.type ?? row?.name ?? '').trim()
+            const count = extractFirstNumber(
+              row?.servedItemUnits ?? row?.itemUnits ?? row?.itemCount ?? row?.value ?? row?.count ?? null,
+            )
+            return { type, value: Number(count) }
+          })
+          .filter((row) => row.type && Number.isFinite(row.value))
+
+        if (mapped.length === 0) {
+          await wait(1500)
+          continue
+        }
+
+        const total = mapped.reduce((sum, row) => sum + row.value, 0)
+        const slides = [{ type: 'Total item units', value: total }, ...mapped]
+
+        if (isMounted) {
+          setItemSlides(slides)
+          setItemSlideIndex(0)
+          setLiveMetrics((current) => ({ ...current, items: Number(total).toLocaleString() }))
+          setLoadingMetrics((current) => ({ ...current, items: false }))
+        }
+        return
+      }
+    }
+
+    const loadFacilitySlides = async () => {
+      while (isMounted) {
+        const payload = await fetchJsonWithRetry(apiUrl('/metadata/served-facilities/by-type'))
+        if (!payload || !isMounted) return
+        const rows = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.value)
+            ? payload.value
+            : payload && typeof payload === 'object'
+              ? [payload]
+              : []
+
+        if (!Array.isArray(rows) || rows.length === 0) {
+          await wait(1500)
+          continue
+        }
+
+        const mapped = rows
+          .map((row) => {
+            const type = String(row?.customerType ?? row?.facilityType ?? row?.type ?? row?.name ?? '').trim()
+            const count = extractFirstNumber(
+              row?.servedFacilities ?? row?.facilityCount ?? row?.count ?? row?.value ?? null,
+            )
+            return { type, value: Number(count) }
+          })
+          .filter((row) => row.type && Number.isFinite(row.value))
+
+        if (mapped.length === 0) {
+          await wait(1500)
+          continue
+        }
+
+        const total = mapped.reduce((sum, row) => sum + row.value, 0)
+        const slides = [{ type: 'Total health facilities served', value: total }, ...mapped]
+
+        if (isMounted) {
+          setFacilitySlides(slides)
+          setFacilitySlideIndex(0)
+          setLiveMetrics((current) => ({ ...current, facilities: Number(total).toLocaleString() }))
+          setLoadingMetrics((current) => ({ ...current, facilities: false }))
+        }
+        return
+      }
     }
 
     const moduleColors = ['#7DBB7D', '#6FA8DC', '#F4A261', '#B39DDB', '#F6B26B', '#80CBC4']
@@ -432,6 +522,8 @@ function App() {
     // Fire all dashboard API requests immediately while splash screen is visible.
     void Promise.all([
       loadLiveMetrics(),
+      loadItemSlides(),
+      loadFacilitySlides(),
       loadModuleTransactions(),
       loadTransactionsByYear(),
       loadCoverageByYear(),
@@ -443,10 +535,46 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (itemSlides.length <= 1) return undefined
+    const interval = window.setInterval(() => {
+      setItemSlideIndex((current) => (current + 1) % itemSlides.length)
+    }, 3200)
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [itemSlides])
+
+  useEffect(() => {
+    if (facilitySlides.length <= 1) return undefined
+    const interval = window.setInterval(() => {
+      setFacilitySlideIndex((current) => (current + 1) % facilitySlides.length)
+    }, 3200)
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [facilitySlides])
+
   const renderMetricValue = (key) => {
     if (loadingMetrics[key]) return <span className="metric-loader" aria-label="Loading metric" />
     return liveMetrics[key]
   }
+
+  const activeItemSlide = itemSlides[itemSlideIndex]
+  const itemCardValue = loadingMetrics.items
+    ? <span className="metric-loader" aria-label="Loading item metrics" />
+    : activeItemSlide
+      ? Number(activeItemSlide.value).toLocaleString()
+      : liveMetrics.items
+  const itemCardType = loadingMetrics.items ? '' : activeItemSlide?.type ?? ''
+  const itemCardLabel = loadingMetrics.items ? 'Number of items' : activeItemSlide?.type ?? 'Number of items'
+  const activeFacilitySlide = facilitySlides[facilitySlideIndex]
+  const facilityCardValue = loadingMetrics.facilities
+    ? <span className="metric-loader" aria-label="Loading facility metrics" />
+    : activeFacilitySlide
+      ? Number(activeFacilitySlide.value).toLocaleString()
+      : liveMetrics.facilities
+  const facilityCardType = loadingMetrics.facilities ? '' : activeFacilitySlide?.type ?? 'Across all regions'
 
   const handleNavigate = (page) => {
     setActivePage(page)
@@ -596,15 +724,16 @@ function App() {
 
         <section className="summary-grid">
           <SummaryCard
-            label="Number of items"
-            value={renderMetricValue('items')}
-            subtitle=""
+            label={itemCardLabel}
+            value={itemCardValue}
+            subtitle={itemCardType}
+            slideKey={`items-${itemSlideIndex}-${itemCardLabel}-${itemCardType}`}
             icon={<Building2 className="card-icon" />}
           />
           <SummaryCard
             label="Data coverage"
-            value="12+ years"
-            subtitle="2012 - 2025"
+            value="11 years"
+            subtitle="2015 - 2026"
             icon={<Calendar className="card-icon" />}
           />
           <SummaryCard
@@ -615,8 +744,9 @@ function App() {
           />
           <SummaryCard
             label="Health facilities served"
-            value={renderMetricValue('facilities')}
-            subtitle="Across all regions"
+            value={facilityCardValue}
+            subtitle={facilityCardType}
+            slideKey={`facilities-${facilitySlideIndex}-${facilityCardType}`}
             icon={<Database className="card-icon" />}
           />
         </section>

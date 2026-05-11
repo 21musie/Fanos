@@ -126,11 +126,10 @@
   height: 100vh;
   flex-shrink: 0;
   overflow: hidden;
-  position: fixed;
+  position: sticky;
   top: 0;
-  left: 0;
-  transform: translateX(-100%);
-  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.12);
+  transform: translateX(0);
+  box-shadow: none;
 }
 
 .sidebar.open {
@@ -232,7 +231,7 @@
 }
 
 .mobile-topbar {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 12px;
   margin-bottom: 18px;
@@ -277,12 +276,18 @@
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 12px;
   padding: 16px;
+  overflow: hidden;
   transition:
     transform 0.22s ease,
     box-shadow 0.22s ease,
     border-color 0.22s ease,
     background-color 0.22s ease;
   transform-origin: center;
+}
+
+.summary-card-slide {
+  animation: summary-slide-in 1400ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
 }
 
 .summary-card:hover {
@@ -343,6 +348,18 @@
   margin: 0;
   color: #757575;
   font-size: 12px;
+  min-height: 18px;
+}
+
+@keyframes summary-slide-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(18px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 .card-icon {
@@ -676,6 +693,17 @@
 }
 
 @media (max-width: 920px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    transform: translateX(-100%);
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .mobile-topbar {
+    display: flex;
+  }
+
   .container {
     padding: 20px 16px;
   }
@@ -702,13 +730,18 @@
 
   .sync-pill {
     min-height: 40px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     padding-block: 8px;
   }
 
+  .sync-pill-status {
+    display: none;
+  }
+
   .sync-pill-time {
-    margin-left: 0;
-    width: 100%;
+    margin-left: auto;
+    width: auto;
+    white-space: nowrap;
   }
 }
 
