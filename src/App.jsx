@@ -279,28 +279,37 @@ function App() {
     }
 
     const moduleColors = ['#7DBB7D', '#6FA8DC', '#F4A261', '#B39DDB', '#F6B26B', '#80CBC4']
-    const moduleLabelMap = {
-      Requisition: 'Requisition',
-      IssueDoc: 'Issue',
-      ReceiveDoc: 'Receive',
-      Invoice: 'Invoice',
-      PurchaseOrder: 'Purchase Order',
-    }
 
     const loadModuleTransactions = async () => {
       while (isMounted) {
-        const payload = await fetchJsonWithRetry(apiUrl('/metadata/transactions/by-module'))
+        const payload = await fetchJsonWithRetry(apiUrl('/metadata/served-facilities/by-type'))
         if (!payload || !isMounted) return
-        if (!Array.isArray(payload) || payload.length === 0) {
+        const rows = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.value)
+            ? payload.value
+            : payload && typeof payload === 'object'
+              ? [payload]
+              : []
+
+        if (!Array.isArray(rows) || rows.length === 0) {
           await wait(1500)
           continue
         }
 
-        const mapped = payload
-          .filter((item) => typeof item?.numberOfTransactions === 'number' && Number.isFinite(item.numberOfTransactions))
+        const mapped = rows
+          .map((item) => ({
+            name: String(item?.customerType ?? item?.facilityType ?? item?.type ?? item?.name ?? '').trim(),
+            value: Number(
+              extractFirstNumber(
+                item?.servedFacilities ?? item?.facilityCount ?? item?.count ?? item?.value ?? null,
+              ),
+            ),
+          }))
+          .filter((item) => item.name && Number.isFinite(item.value))
           .map((item, index) => ({
-            name: moduleLabelMap[item.module] ?? item.module ?? `Module ${index + 1}`,
-            value: item.numberOfTransactions,
+            name: item.name,
+            value: item.value,
             color: moduleColors[index % moduleColors.length],
           }))
 
@@ -762,8 +771,8 @@ function App() {
             <HubMapCard />
 
             <article className="panel">
-              <h2>Total transactions by module</h2>
-              <p className="panel-subtitle">Breakdown of {loadingMetrics.transactions ? 'live transactions' : liveMetrics.transactions} transactions across all modules</p>
+              <h2>Health facilities served by type</h2>
+              <p className="panel-subtitle">Distribution of served health facilities across facility types</p>
 
               {isDonutLoading ? (
                 <div className="donut-loader-wrap">

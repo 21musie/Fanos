@@ -99,9 +99,9 @@ function ModuleTransactionDonut({ data, formatValue }) {
           labelLine={false}
           label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
           outerRadius={130}
-          innerRadius={72}
+          innerRadius={0}
           paddingAngle={2}
-          cornerRadius={8}
+          cornerRadius={3}
           dataKey="value"
           activeIndex={activeIndex}
           activeShape={activeShape}
