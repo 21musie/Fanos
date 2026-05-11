@@ -79,7 +79,7 @@ function TransactionVolumeChart({ data, formatYAxis }) {
         <Bar
           dataKey="Issues"
           stackId="a"
-          fill={colorFor('Issues', '#84EB84')}
+          fill={colorFor('Issues', '#F4A261')}
           stroke="#ffffff"
           strokeWidth={0.6}
           onMouseEnter={() => setActiveSeries('Issues')}

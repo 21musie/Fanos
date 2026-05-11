@@ -14,6 +14,7 @@ import ModuleSyncStatus from './components/ModuleSyncStatus'
 import HubMapCard from './components/HubMapCard'
 import ModuleTransactionDonut from './components/ModuleTransactionDonut'
 import TransactionVolumeChart from './components/TransactionVolumeChart'
+import InteractiveSummaryCard from './components/InteractiveSummaryCard'
 import { apiUrl } from './config'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import './App.css'
@@ -60,7 +61,7 @@ const formatYAxis = (value) => {
 
 const CustomLegend = () => {
   const legendItems = [
-    { label: 'Issues', color: '#84EB84' },
+    { label: 'Issues', color: '#F4A261' },
     { label: 'Receive', color: '#6FA8DC' },
   ]
 
@@ -86,19 +87,22 @@ function App() {
   const [coverageData, setCoverageData] = useState(defaultCoverageData)
   const [isDonutLoading, setIsDonutLoading] = useState(true)
   const [isSyncStatusLoading, setIsSyncStatusLoading] = useState(true)
-  const [issuesMonthlyRows, setIssuesMonthlyRows] = useState([])
+  const [transactionsMonthlyRows, setTransactionsMonthlyRows] = useState([])
   const [issuesTopRows, setIssuesTopRows] = useState([])
+  const [receivesTopRows, setReceivesTopRows] = useState([])
   const [issuesPageLoading, setIssuesPageLoading] = useState(true)
+  const [receivesPageLoading, setReceivesPageLoading] = useState(true)
   const [selectedIssuesYear, setSelectedIssuesYear] = useState('2026')
+  const [selectedReceivesYear, setSelectedReceivesYear] = useState('2026')
   const [liveMetrics, setLiveMetrics] = useState({
     items: '',
     transactions: '',
     facilities: '',
   })
   const [itemSlides, setItemSlides] = useState([])
-  const [itemSlideIndex, setItemSlideIndex] = useState(0)
+
   const [facilitySlides, setFacilitySlides] = useState([])
-  const [facilitySlideIndex, setFacilitySlideIndex] = useState(0)
+
   const [loadingMetrics, setLoadingMetrics] = useState({
     items: true,
     transactions: true,
@@ -202,8 +206,11 @@ function App() {
               : []
 
         if (!Array.isArray(rows) || rows.length === 0) {
-          await wait(1500)
-          continue
+          if (isMounted) {
+            setItemSlides([])
+            setLoadingMetrics((current) => ({ ...current, items: false }))
+          }
+          return
         }
 
         const mapped = rows
@@ -217,8 +224,11 @@ function App() {
           .filter((row) => row.type && Number.isFinite(row.value))
 
         if (mapped.length === 0) {
-          await wait(1500)
-          continue
+          if (isMounted) {
+            setItemSlides([])
+            setLoadingMetrics((current) => ({ ...current, items: false }))
+          }
+          return
         }
 
         const total = mapped.reduce((sum, row) => sum + row.value, 0)
@@ -226,7 +236,7 @@ function App() {
 
         if (isMounted) {
           setItemSlides(slides)
-          setItemSlideIndex(0)
+
           setLiveMetrics((current) => ({ ...current, items: Number(total).toLocaleString() }))
           setLoadingMetrics((current) => ({ ...current, items: false }))
         }
@@ -247,8 +257,11 @@ function App() {
               : []
 
         if (!Array.isArray(rows) || rows.length === 0) {
-          await wait(1500)
-          continue
+          if (isMounted) {
+            setFacilitySlides([])
+            setLoadingMetrics((current) => ({ ...current, facilities: false }))
+          }
+          return
         }
 
         const mapped = rows
@@ -262,16 +275,19 @@ function App() {
           .filter((row) => row.type && Number.isFinite(row.value))
 
         if (mapped.length === 0) {
-          await wait(1500)
-          continue
+          if (isMounted) {
+            setFacilitySlides([])
+            setLoadingMetrics((current) => ({ ...current, facilities: false }))
+          }
+          return
         }
 
         const total = mapped.reduce((sum, row) => sum + row.value, 0)
-        const slides = [{ type: 'Total health facilities served', value: total }, ...mapped]
+        const slides = [{ type: 'Total facilities served', value: total }, ...mapped]
 
         if (isMounted) {
           setFacilitySlides(slides)
-          setFacilitySlideIndex(0)
+
           setLiveMetrics((current) => ({ ...current, facilities: Number(total).toLocaleString() }))
           setLoadingMetrics((current) => ({ ...current, facilities: false }))
         }
@@ -530,7 +546,7 @@ function App() {
       }
     }
 
-    const loadIssuesMonthly = async () => {
+    const loadTransactionsMonthly = async () => {
       while (isMounted) {
         const payload = await fetchJsonWithRetry(apiUrl('/metadata/transactions/monthly'))
         if (!payload || !isMounted) return
@@ -539,7 +555,7 @@ function App() {
           await wait(1500)
           continue
         }
-        if (isMounted) setIssuesMonthlyRows(rows)
+        if (isMounted) setTransactionsMonthlyRows(rows)
         return
       }
     }
@@ -558,6 +574,20 @@ function App() {
       }
     }
 
+    const loadReceivesTopTen = async () => {
+      while (isMounted) {
+        const payload = await fetchJsonWithRetry(apiUrl('/metadata/receives/recent-top10'))
+        if (!payload || !isMounted) return
+        const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.value) ? payload.value : []
+        if (!Array.isArray(rows) || rows.length === 0) {
+          await wait(1500)
+          continue
+        }
+        if (isMounted) setReceivesTopRows(rows)
+        return
+      }
+    }
+
     // Fire all dashboard API requests immediately while splash screen is visible.
     void Promise.all([
       loadLiveMetrics(),
@@ -567,8 +597,9 @@ function App() {
       loadTransactionsByYear(),
       loadCoverageByYear(),
       loadSyncStatus(),
-      loadIssuesMonthly(),
+      loadTransactionsMonthly(),
       loadIssuesTopTen(),
+      loadReceivesTopTen(),
     ])
 
     return () => {
@@ -577,72 +608,55 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (issuesMonthlyRows.length > 0 && issuesTopRows.length > 0) {
+    if (transactionsMonthlyRows.length > 0 && issuesTopRows.length > 0) {
       setIssuesPageLoading(false)
     }
-  }, [issuesMonthlyRows, issuesTopRows])
+  }, [transactionsMonthlyRows, issuesTopRows])
 
   useEffect(() => {
-    if (itemSlides.length <= 1) return undefined
-    const interval = window.setInterval(() => {
-      setItemSlideIndex((current) => (current + 1) % itemSlides.length)
-    }, 3200)
-    return () => {
-      window.clearInterval(interval)
+    if (transactionsMonthlyRows.length > 0 && receivesTopRows.length > 0) {
+      setReceivesPageLoading(false)
     }
-  }, [itemSlides])
+  }, [transactionsMonthlyRows, receivesTopRows])
 
-  useEffect(() => {
-    if (facilitySlides.length <= 1) return undefined
-    const interval = window.setInterval(() => {
-      setFacilitySlideIndex((current) => (current + 1) % facilitySlides.length)
-    }, 3200)
-    return () => {
-      window.clearInterval(interval)
-    }
-  }, [facilitySlides])
 
   const renderMetricValue = (key) => {
     if (loadingMetrics[key]) return <span className="metric-loader" aria-label="Loading metric" />
     return liveMetrics[key]
   }
 
-  const activeItemSlide = itemSlides[itemSlideIndex]
-  const itemCardValue = loadingMetrics.items
-    ? <span className="metric-loader" aria-label="Loading item metrics" />
-    : activeItemSlide
-      ? Number(activeItemSlide.value).toLocaleString()
-      : liveMetrics.items
-  const itemCardType = loadingMetrics.items ? '' : activeItemSlide?.type ?? ''
-  const itemCardLabel = loadingMetrics.items ? 'Number of items' : activeItemSlide?.type ?? 'Number of items'
-  const activeFacilitySlide = facilitySlides[facilitySlideIndex]
-  const facilityCardValue = loadingMetrics.facilities
-    ? <span className="metric-loader" aria-label="Loading facility metrics" />
-    : activeFacilitySlide
-      ? Number(activeFacilitySlide.value).toLocaleString()
-      : liveMetrics.facilities
-  const facilityCardType = loadingMetrics.facilities ? '' : activeFacilitySlide?.type ?? 'Across all regions'
-  const issueYears = Array.from({ length: 15 }, (_, index) => String(2012 + index))
-  const issuesMonthlyChartData = (() => {
+  const monthlyChartYears = Array.from({ length: 12 }, (_, index) => String(2015 + index))
+
+  const buildMonthlyVolumeByModule = (moduleCode, year) => {
     const monthMap = new Map([
       [1, 'Jan'], [2, 'Feb'], [3, 'Mar'], [4, 'Apr'], [5, 'May'], [6, 'Jun'],
       [7, 'Jul'], [8, 'Aug'], [9, 'Sep'], [10, 'Oct'], [11, 'Nov'], [12, 'Dec'],
     ])
     const aggregate = new Map()
-    for (const row of issuesMonthlyRows) {
-      const module = String(row?.module || '')
-      const year = String(row?.transactionYear || '')
+    for (const row of transactionsMonthlyRows) {
+      const mod = String(row?.module || '')
+      const y = String(row?.transactionYear || '')
       const month = Number(row?.transactionMonth)
       const count = Number(row?.transactionCount)
-      if (module !== 'IssueDoc' || year !== selectedIssuesYear || !Number.isFinite(month) || !Number.isFinite(count)) continue
+      if (mod !== moduleCode || y !== year || !Number.isFinite(month) || !Number.isFinite(count)) continue
       aggregate.set(month, (aggregate.get(month) || 0) + count)
     }
     return [...aggregate.entries()]
       .sort((a, b) => a[0] - b[0])
-      .map(([month, volume]) => ({ month: monthMap.get(month) ?? String(month), volume }))
-  })()
+      .map(([m, volume]) => ({ month: monthMap.get(m) ?? String(m), volume }))
+  }
+
+  const issuesMonthlyChartData = buildMonthlyVolumeByModule('IssueDoc', selectedIssuesYear)
+  const receivesMonthlyChartData = buildMonthlyVolumeByModule('ReceiveDoc', selectedReceivesYear)
 
   const filteredIssuesRows = issuesTopRows
+  const filteredReceivesRows = receivesTopRows
+
+  const formatReceiveExpiry = (raw) => {
+    const digits = String(raw ?? '').replace(/\D/g, '')
+    if (digits.length === 8) return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`
+    return String(raw || '').trim() || '-'
+  }
 
   const handleNavigate = (page) => {
     setActivePage(page)
@@ -704,7 +718,7 @@ function App() {
                 value={selectedIssuesYear}
                 onChange={(event) => setSelectedIssuesYear(event.target.value)}
               >
-                {issueYears.map((year) => (
+                {monthlyChartYears.map((year) => (
                   <option key={year} value={year}>{year}</option>
                 ))}
               </select>
@@ -731,7 +745,7 @@ function App() {
                         }}
                         formatter={(value) => formatYAxis(Number(value))}
                       />
-                      <Bar dataKey="volume" fill="#84EB84" radius={[6, 6, 0, 0]} isAnimationActive={false} />
+                      <Bar dataKey="volume" fill="#F4A261" radius={[6, 6, 0, 0]} isAnimationActive={false} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -769,6 +783,98 @@ function App() {
                               <td>{Number.isFinite(Number(row?.actualQuantityDelivered)) ? Number(row.actualQuantityDelivered).toLocaleString() : '-'}</td>
                               <td>{row?.customerName || '-'}</td>
                               <td>{row?.region || '-'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
+          </article>
+        </section>
+      )
+    }
+
+    if (activePage === 'receives') {
+      return (
+        <section className="page-section">
+          <article className="panel">
+            <h2>Receives monthly volume</h2>
+            <p className="panel-subtitle">Monthly receive transaction volume for selected year (all sources)</p>
+            <div className="issues-filter-row">
+              <label htmlFor="receives-year-select">Year</label>
+              <select
+                id="receives-year-select"
+                value={selectedReceivesYear}
+                onChange={(event) => setSelectedReceivesYear(event.target.value)}
+              >
+                {monthlyChartYears.map((year) => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+
+            {receivesPageLoading ? (
+              <div className="donut-loader-wrap">
+                <span className="donut-loader" aria-label="Loading receives page" />
+              </div>
+            ) : (
+              <>
+                <div className="issues-chart-wrap">
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart data={receivesMonthlyChartData} margin={{ top: 8, right: 10, left: 10, bottom: 24 }} barCategoryGap="20%">
+                      <CartesianGrid strokeDasharray="0" stroke="#F0F0F0" vertical={false} />
+                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#000000' }} axisLine={{ stroke: '#E0E0E0' }} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: '#757575' }} axisLine={false} tickLine={false} tickFormatter={formatYAxis} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#fff',
+                          border: '1px solid rgba(0,0,0,0.1)',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                        }}
+                        formatter={(value) => formatYAxis(Number(value))}
+                      />
+                      <Bar dataKey="volume" fill="#6FA8DC" radius={[6, 6, 0, 0]} isAnimationActive={false} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="issues-table-card">
+                  <div className="issues-table-header">
+                    <h3>Recent top 10 receives</h3>
+                    <span>All recent records</span>
+                  </div>
+                  <div className="issues-table-scroll">
+                    <table className="issues-table">
+                      <thead>
+                        <tr>
+                          <th>Document #</th>
+                          <th>Date</th>
+                          <th>Material</th>
+                          <th>Description</th>
+                          <th>Qty</th>
+                          <th>Plant</th>
+                          <th>Expiry</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredReceivesRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="issues-empty-row">No receive records available</td>
+                          </tr>
+                        ) : (
+                          filteredReceivesRows.map((row, index) => (
+                            <tr key={`${row?.documentNumber}-${row?.batchNumber}-${index}`}>
+                              <td>{row?.documentNumber || '-'}</td>
+                              <td>{String(row?.receiveDate || '').slice(0, 10) || '-'}</td>
+                              <td>{row?.materialNumber || '-'}</td>
+                              <td>{row?.material || '-'}</td>
+                              <td>{Number.isFinite(Number(row?.quantity)) ? Number(row.quantity).toLocaleString() : '-'}</td>
+                              <td>{row?.plant || '-'}</td>
+                              <td>{formatReceiveExpiry(row?.expiryDate)}</td>
                             </tr>
                           ))
                         )}
@@ -878,17 +984,16 @@ function App() {
     return (
       <>
         <header className="page-header">
-          <h1>Current Data Status</h1>
+          <h1>FANOS Data Scope & Coverage</h1>
           <p>Understand the freshness, completeness, quality, and scope of the data powering this dashboard.</p>
         </header>
 
         <section className="summary-grid">
-          <SummaryCard
-            label={itemCardLabel}
-            value={itemCardValue}
-            subtitle={itemCardType}
-            slideKey={`items-${itemSlideIndex}-${itemCardLabel}-${itemCardType}`}
+          <InteractiveSummaryCard
+            title="Number of items"
             icon={<Building2 className="card-icon" />}
+            slides={itemSlides}
+            loading={loadingMetrics.items}
           />
           <SummaryCard
             label="Data coverage"
@@ -902,12 +1007,11 @@ function App() {
             subtitle="All modules combined"
             icon={<Activity className="card-icon" />}
           />
-          <SummaryCard
-            label="Health facilities served"
-            value={facilityCardValue}
-            subtitle={facilityCardType}
-            slideKey={`facilities-${facilitySlideIndex}-${facilityCardType}`}
+          <InteractiveSummaryCard
+            title="Health facilities served"
             icon={<Database className="card-icon" />}
+            slides={facilitySlides}
+            loading={loadingMetrics.facilities}
           />
         </section>
 
@@ -955,7 +1059,7 @@ function App() {
           </article>
 
           <article className="panel">
-            <h2>Module sync status</h2>
+            <h2>SAP Data Sync Status</h2>
             <p className="panel-subtitle">Current feed health by data module · as of last dashboard refresh</p>
             {isSyncStatusLoading ? (
               <div className="donut-loader-wrap">
