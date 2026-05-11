@@ -15,6 +15,7 @@ import HubMapCard from './components/HubMapCard'
 import ModuleTransactionDonut from './components/ModuleTransactionDonut'
 import TransactionVolumeChart from './components/TransactionVolumeChart'
 import { apiUrl } from './config'
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import './App.css'
 
 const defaultModuleTransactionData = [
@@ -26,17 +27,17 @@ const defaultModuleTransactionData = [
 ]
 
 const defaultTransactionVolumeData = [
-  { year: '2015', Issues: 80000, Receive: 75000, 'Purchase Orders': 45000 },
-  { year: '2016', Issues: 95000, Receive: 88000, 'Purchase Orders': 52000 },
-  { year: '2017', Issues: 110000, Receive: 105000, 'Purchase Orders': 62000 },
-  { year: '2018', Issues: 145000, Receive: 138000, 'Purchase Orders': 78000 },
-  { year: '2019', Issues: 180000, Receive: 165000, 'Purchase Orders': 95000 },
-  { year: '2020', Issues: 95000, Receive: 82000, 'Purchase Orders': 48000 },
-  { year: '2021', Issues: 195000, Receive: 185000, 'Purchase Orders': 105000 },
-  { year: '2022', Issues: 225000, Receive: 210000, 'Purchase Orders': 125000 },
-  { year: '2023', Issues: 250000, Receive: 235000, 'Purchase Orders': 142000 },
-  { year: '2024', Issues: 275000, Receive: 258000, 'Purchase Orders': 158000 },
-  { year: '2025', Issues: 285000, Receive: 268000, 'Purchase Orders': 165000 },
+  { year: '2015', Issues: 80000, Receive: 75000 },
+  { year: '2016', Issues: 95000, Receive: 88000 },
+  { year: '2017', Issues: 110000, Receive: 105000 },
+  { year: '2018', Issues: 145000, Receive: 138000 },
+  { year: '2019', Issues: 180000, Receive: 165000 },
+  { year: '2020', Issues: 95000, Receive: 82000 },
+  { year: '2021', Issues: 195000, Receive: 185000 },
+  { year: '2022', Issues: 225000, Receive: 210000 },
+  { year: '2023', Issues: 250000, Receive: 235000 },
+  { year: '2024', Issues: 275000, Receive: 258000 },
+  { year: '2025', Issues: 285000, Receive: 268000 },
 ]
 
 const defaultSyncStatusData = [
@@ -48,10 +49,7 @@ const defaultSyncStatusData = [
 
 const defaultCoverageData = [
   { module: 'Issues', offset: 0, vitas: 12, gap: 0, sap: 2 },
-  { module: 'Purchase orders', offset: 1, vitas: 11, gap: 0, sap: 2 },
   { module: 'Receive', offset: 2, vitas: 10, gap: 0, sap: 2 },
-  { module: 'Requisition', offset: 3, vitas: 9, gap: 0, sap: 2 },
-  { module: 'Invoice', offset: 0, vitas: 12, gap: 0, sap: 0 },
 ]
 
 const formatYAxis = (value) => {
@@ -62,9 +60,8 @@ const formatYAxis = (value) => {
 
 const CustomLegend = () => {
   const legendItems = [
-    { label: 'Issues', color: '#F4A261' },
+    { label: 'Issues', color: '#84EB84' },
     { label: 'Receive', color: '#6FA8DC' },
-    { label: 'Purchase Orders', color: '#7DBB7D' },
   ]
 
   return (
@@ -89,6 +86,10 @@ function App() {
   const [coverageData, setCoverageData] = useState(defaultCoverageData)
   const [isDonutLoading, setIsDonutLoading] = useState(true)
   const [isSyncStatusLoading, setIsSyncStatusLoading] = useState(true)
+  const [issuesMonthlyRows, setIssuesMonthlyRows] = useState([])
+  const [issuesTopRows, setIssuesTopRows] = useState([])
+  const [issuesPageLoading, setIssuesPageLoading] = useState(true)
+  const [selectedIssuesYear, setSelectedIssuesYear] = useState('2026')
   const [liveMetrics, setLiveMetrics] = useState({
     items: '',
     transactions: '',
@@ -329,7 +330,7 @@ function App() {
     const byYearSeriesMap = {
       IssueDoc: 'Issues',
       ReceiveDoc: 'Receive',
-      PurchaseOrder: 'Purchase Orders',
+      // PurchaseOrder: 'Purchase Orders',
     }
 
     const loadTransactionsByYear = async () => {
@@ -360,7 +361,7 @@ function App() {
 
           const year = String(yearNum)
           if (!yearly[year]) {
-            yearly[year] = { year, Issues: 0, Receive: 0, 'Purchase Orders': 0 }
+            yearly[year] = { year, Issues: 0, Receive: 0 }
           }
           yearly[year][series] += count
         }
@@ -388,9 +389,9 @@ function App() {
         const labelMap = {
           IssueDoc: 'Issues',
           ReceiveDoc: 'Receive',
-          PurchaseOrder: 'Purchase orders',
-          Requisition: 'Requisition',
-          Invoice: 'Invoice',
+          // PurchaseOrder: 'Purchase orders',
+          // Requisition: 'Requisition',
+          // Invoice: 'Invoice',
           StockOnHand: 'Stock on hand',
           SOHSnapshot: 'Stock on hand',
         }
@@ -404,6 +405,7 @@ function App() {
           const year = Number(row?.transactionYear)
           const count = Number(row?.transactionCount)
           if (!Number.isFinite(year) || !Number.isFinite(count) || year < rangeStart || year > rangeEnd || count <= 0) continue
+          if (row?.module === 'Requisition' || row?.module === 'PurchaseOrder' || row?.module === 'Invoice') continue
 
           const moduleLabel = labelMap[row?.module] ?? String(row?.module || 'Unknown')
           if (!aggregate.has(moduleLabel)) {
@@ -528,6 +530,34 @@ function App() {
       }
     }
 
+    const loadIssuesMonthly = async () => {
+      while (isMounted) {
+        const payload = await fetchJsonWithRetry(apiUrl('/metadata/transactions/monthly'))
+        if (!payload || !isMounted) return
+        const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.value) ? payload.value : []
+        if (!Array.isArray(rows) || rows.length === 0) {
+          await wait(1500)
+          continue
+        }
+        if (isMounted) setIssuesMonthlyRows(rows)
+        return
+      }
+    }
+
+    const loadIssuesTopTen = async () => {
+      while (isMounted) {
+        const payload = await fetchJsonWithRetry(apiUrl('/metadata/issues/recent-top10'))
+        if (!payload || !isMounted) return
+        const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.value) ? payload.value : []
+        if (!Array.isArray(rows) || rows.length === 0) {
+          await wait(1500)
+          continue
+        }
+        if (isMounted) setIssuesTopRows(rows)
+        return
+      }
+    }
+
     // Fire all dashboard API requests immediately while splash screen is visible.
     void Promise.all([
       loadLiveMetrics(),
@@ -537,12 +567,20 @@ function App() {
       loadTransactionsByYear(),
       loadCoverageByYear(),
       loadSyncStatus(),
+      loadIssuesMonthly(),
+      loadIssuesTopTen(),
     ])
 
     return () => {
       isMounted = false
     }
   }, [])
+
+  useEffect(() => {
+    if (issuesMonthlyRows.length > 0 && issuesTopRows.length > 0) {
+      setIssuesPageLoading(false)
+    }
+  }, [issuesMonthlyRows, issuesTopRows])
 
   useEffect(() => {
     if (itemSlides.length <= 1) return undefined
@@ -584,6 +622,27 @@ function App() {
       ? Number(activeFacilitySlide.value).toLocaleString()
       : liveMetrics.facilities
   const facilityCardType = loadingMetrics.facilities ? '' : activeFacilitySlide?.type ?? 'Across all regions'
+  const issueYears = Array.from({ length: 15 }, (_, index) => String(2012 + index))
+  const issuesMonthlyChartData = (() => {
+    const monthMap = new Map([
+      [1, 'Jan'], [2, 'Feb'], [3, 'Mar'], [4, 'Apr'], [5, 'May'], [6, 'Jun'],
+      [7, 'Jul'], [8, 'Aug'], [9, 'Sep'], [10, 'Oct'], [11, 'Nov'], [12, 'Dec'],
+    ])
+    const aggregate = new Map()
+    for (const row of issuesMonthlyRows) {
+      const module = String(row?.module || '')
+      const year = String(row?.transactionYear || '')
+      const month = Number(row?.transactionMonth)
+      const count = Number(row?.transactionCount)
+      if (module !== 'IssueDoc' || year !== selectedIssuesYear || !Number.isFinite(month) || !Number.isFinite(count)) continue
+      aggregate.set(month, (aggregate.get(month) || 0) + count)
+    }
+    return [...aggregate.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([month, volume]) => ({ month: monthMap.get(month) ?? String(month), volume }))
+  })()
+
+  const filteredIssuesRows = issuesTopRows
 
   const handleNavigate = (page) => {
     setActivePage(page)
@@ -627,6 +686,98 @@ function App() {
                 <span>42 active validation checks · 98.4% pass rate</span>
               </div>
             </div>
+          </article>
+        </section>
+      )
+    }
+
+    if (activePage === 'issues') {
+      return (
+        <section className="page-section">
+          <article className="panel">
+            <h2>Issues monthly volume</h2>
+            <p className="panel-subtitle">Monthly issue volume for selected year</p>
+            <div className="issues-filter-row">
+              <label htmlFor="issues-year-select">Year</label>
+              <select
+                id="issues-year-select"
+                value={selectedIssuesYear}
+                onChange={(event) => setSelectedIssuesYear(event.target.value)}
+              >
+                {issueYears.map((year) => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+
+            {issuesPageLoading ? (
+              <div className="donut-loader-wrap">
+                <span className="donut-loader" aria-label="Loading issues page" />
+              </div>
+            ) : (
+              <>
+                <div className="issues-chart-wrap">
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart data={issuesMonthlyChartData} margin={{ top: 8, right: 10, left: 10, bottom: 24 }} barCategoryGap="20%">
+                      <CartesianGrid strokeDasharray="0" stroke="#F0F0F0" vertical={false} />
+                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#000000' }} axisLine={{ stroke: '#E0E0E0' }} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: '#757575' }} axisLine={false} tickLine={false} tickFormatter={formatYAxis} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#fff',
+                          border: '1px solid rgba(0,0,0,0.1)',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                        }}
+                        formatter={(value) => formatYAxis(Number(value))}
+                      />
+                      <Bar dataKey="volume" fill="#84EB84" radius={[6, 6, 0, 0]} isAnimationActive={false} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="issues-table-card">
+                  <div className="issues-table-header">
+                    <h3>Recent top 10 issues</h3>
+                    <span>All recent records</span>
+                  </div>
+                  <div className="issues-table-scroll">
+                    <table className="issues-table">
+                      <thead>
+                        <tr>
+                          <th>Delivery #</th>
+                          <th>Date</th>
+                          <th>Material</th>
+                          <th>Description</th>
+                          <th>Qty</th>
+                          <th>Facility</th>
+                          <th>Region</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredIssuesRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="issues-empty-row">No issue records available</td>
+                          </tr>
+                        ) : (
+                          filteredIssuesRows.map((row) => (
+                            <tr key={`${row?.deliveryNumber}-${row?.materialNumber}-${row?.batchNumber}`}>
+                              <td>{row?.deliveryNumber || '-'}</td>
+                              <td>{String(row?.deliveryDate || '').slice(0, 10) || '-'}</td>
+                              <td>{row?.materialNumber || '-'}</td>
+                              <td>{row?.materialDescription || '-'}</td>
+                              <td>{Number.isFinite(Number(row?.actualQuantityDelivered)) ? Number(row.actualQuantityDelivered).toLocaleString() : '-'}</td>
+                              <td>{row?.customerName || '-'}</td>
+                              <td>{row?.region || '-'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
           </article>
         </section>
       )
@@ -794,7 +945,7 @@ function App() {
           </section>
 
           <article className="panel">
-            <h2>Transaction volume over 12 years</h2>
+            <h2>Transaction volume over 11 years</h2>
             <p className="panel-subtitle">Yearly transactions by module type</p>
 
             <div className="transaction-chart">

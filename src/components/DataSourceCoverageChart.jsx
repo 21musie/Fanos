@@ -58,9 +58,44 @@ const toVibrant = (hex) => {
   return rgbToHex(vivid.r, vivid.g, vivid.b)
 }
 
+const GapBarShape = (props) => {
+  const {
+    x = 0, y = 0, width = 0, height = 0, fill = '#ECECEC',
+  } = props
+  if (width <= 0 || height <= 0) return null
+
+  const slashStep = 6
+  const slashLines = []
+  for (let i = -height; i <= width + height; i += slashStep) {
+    slashLines.push(
+      <line
+        key={`slash-${i}`}
+        x1={x + i}
+        y1={y + height}
+        x2={x + i + height}
+        y2={y}
+        stroke="#C7C7C7"
+        strokeWidth={1.4}
+      />,
+    )
+  }
+
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} fill={fill} />
+      <clipPath id={`gap-clip-${x}-${y}-${width}-${height}`}>
+        <rect x={x} y={y} width={width} height={height} />
+      </clipPath>
+      <g clipPath={`url(#gap-clip-${x}-${y}-${width}-${height})`}>
+        {slashLines}
+      </g>
+      <rect x={x} y={y} width={width} height={height} fill="none" stroke="#D6D6D6" strokeWidth={1} />
+    </g>
+  )
+}
+
 function DataSourceCoverageChart({ data = [] }) {
   const [activeSeries, setActiveSeries] = useState('')
-  const [isCutoverHovered, setIsCutoverHovered] = useState(false)
   const getSeriesColor = (key, baseColor) => (activeSeries === key ? toVibrant(baseColor) : baseColor)
 
   return (
@@ -71,8 +106,14 @@ function DataSourceCoverageChart({ data = [] }) {
           layout="vertical"
           margin={{ top: 24, right: 18, left: 38, bottom: 4 }}
           barCategoryGap={14}
-          onMouseLeave={() => setIsCutoverHovered(false)}
+          barSize={36}
         >
+          <defs>
+            <pattern id="coverage-gap-slash" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width="8" height="8" fill="#ECECEC" />
+              <line x1="0" y1="0" x2="0" y2="8" stroke="#C7C7C7" strokeWidth="2" />
+            </pattern>
+          </defs>
           <CartesianGrid strokeDasharray="0" stroke="#F0F0F0" horizontal={false} />
           <XAxis
             type="number"
@@ -103,23 +144,29 @@ function DataSourceCoverageChart({ data = [] }) {
 
           <ReferenceLine
             x={12}
-            className={`coverage-cutover-line ${isCutoverHovered ? 'active' : ''}`}
-            stroke={isCutoverHovered ? '#1565C0' : '#8AA3BF'}
-            strokeWidth={isCutoverHovered ? 2.5 : 1.5}
-            strokeDasharray={isCutoverHovered ? '4 4' : '3 5'}
+            className="coverage-cutover-line active"
+            stroke="#1565C0"
+            strokeWidth={2.5}
+            strokeDasharray="4 4"
             isFront
             ifOverflow="visible"
-            onMouseEnter={() => setIsCutoverHovered(true)}
             label={{
               value: 'May 2024',
-              position: 'insideTop',
-              fill: isCutoverHovered ? '#1565C0' : '#6f7f90',
-              fontSize: isCutoverHovered ? 12 : 11,
+              position: 'top',
+              dy: -6,
+              fill: '#1565C0',
+              fontSize: 11,
               fontWeight: 600,
             }}
           />
 
-          <Bar dataKey="offset" stackId="coverage" fill="rgba(0,0,0,0)" isAnimationActive={false} />
+          <Bar
+            dataKey="offset"
+            stackId="coverage"
+            fill="#ECECEC"
+            shape={<GapBarShape />}
+            isAnimationActive={false}
+          />
 
           <Bar
             dataKey="vitas"
@@ -132,7 +179,14 @@ function DataSourceCoverageChart({ data = [] }) {
           >
             <LabelList dataKey="vitas" position="inside" formatter={(v) => (Number(v) >= 1.5 ? 'VITAS' : '')} fill="#fff" fontSize={10} />
           </Bar>
-          <Bar dataKey="gap" stackId="coverage" fill="#EAEAEA" isAnimationActive={false} />
+          <Bar
+            dataKey="gap"
+            stackId="coverage"
+            fill="#ECECEC"
+            minPointSize={5}
+            shape={<GapBarShape />}
+            isAnimationActive={false}
+          />
           <Bar
             dataKey="sap"
             stackId="coverage"
@@ -157,7 +211,7 @@ function DataSourceCoverageChart({ data = [] }) {
           <span className="chart-legend-label">SAP ERP (2024+)</span>
         </div>
         <div className="chart-legend-item">
-          <span className="chart-legend-dot chart-legend-gap" />
+          <span className="chart-legend-bar chart-legend-gap" />
           <span className="chart-legend-label">Gap (no data)</span>
         </div>
       </div>
