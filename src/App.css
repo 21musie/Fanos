@@ -271,6 +271,34 @@
   margin-bottom: 28px;
 }
 
+.summary-grid.compact-cards {
+  gap: 12px;
+}
+
+.summary-grid.compact-cards .summary-card {
+  padding: 12px;
+}
+
+.summary-grid.compact-cards .summary-card h3 {
+  margin: 10px 0 4px;
+  font-size: 24px;
+  min-height: 34px;
+}
+
+.summary-grid.compact-cards .summary-header p {
+  font-size: 12px;
+}
+
+.summary-grid.compact-cards .summary-subtitle {
+  font-size: 11px;
+  min-height: 16px;
+}
+
+.summary-grid.compact-cards .card-icon {
+  width: 18px;
+  height: 18px;
+}
+
 .summary-card {
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -621,6 +649,10 @@
   margin: 0 0 20px;
   color: #757575;
   font-size: 12px;
+}
+
+.coverage-panel .panel-subtitle {
+  margin-bottom: 12px;
 }
 
 .chart-legend {

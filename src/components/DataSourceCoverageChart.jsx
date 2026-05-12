@@ -100,13 +100,13 @@ function DataSourceCoverageChart({ data = [] }) {
 
   return (
     <div>
-      <ResponsiveContainer width="100%" height={320}>
+      <ResponsiveContainer width="100%" height={220}>
         <BarChart
           data={data}
           layout="vertical"
           margin={{ top: 24, right: 18, left: 38, bottom: 4 }}
-          barCategoryGap={14}
-          barSize={36}
+          barCategoryGap={8}
+          barSize={22}
         >
           <defs>
             <pattern id="coverage-gap-slash" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">

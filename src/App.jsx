@@ -4,7 +4,11 @@ import {
   Building2,
   Calendar,
   Database,
+  FileText,
   Menu,
+  PackageCheck,
+  TrendingDown,
+  TrendingUp,
   X,
 } from 'lucide-react'
 import Sidebar from './components/Sidebar'
@@ -90,6 +94,7 @@ function App() {
   const [transactionsMonthlyRows, setTransactionsMonthlyRows] = useState([])
   const [issuesTopRows, setIssuesTopRows] = useState([])
   const [receivesTopRows, setReceivesTopRows] = useState([])
+  const [lastPODate, setLastPODate] = useState(null)
   const [issuesPageLoading, setIssuesPageLoading] = useState(true)
   const [receivesPageLoading, setReceivesPageLoading] = useState(true)
   const [selectedIssuesYear, setSelectedIssuesYear] = useState('2026')
@@ -981,6 +986,17 @@ function App() {
       )
     }
 
+    const lastIssueDate = issuesTopRows.length
+      ? issuesTopRows.reduce((best, r) => (r.deliveryDate > best ? r.deliveryDate : best), '').slice(0, 10)
+      : null
+
+    const lastReceiveDate = receivesTopRows.length
+      ? receivesTopRows.reduce((best, r) => (r.receiveDate > best ? r.receiveDate : best), '').slice(0, 10)
+      : null
+
+    const sohAsOfDate =
+      syncStatusData.find((m) => m.module.toLowerCase().includes('usablestock'))?.lastSync ?? null
+
     return (
       <>
         <header className="page-header">
@@ -1012,6 +1028,33 @@ function App() {
             icon={<Database className="card-icon" />}
             slides={facilitySlides}
             loading={loadingMetrics.facilities}
+          />
+        </section>
+
+        <section className="summary-grid compact-cards">
+          <SummaryCard
+            label="Last Issue Date"
+            value={issuesTopRows.length ? lastIssueDate : <span className="metric-loader" aria-label="Loading" />}
+            subtitle="Most recent issue transaction"
+            icon={<TrendingDown className="card-icon" />}
+          />
+          <SummaryCard
+            label="Last Receive Date"
+            value={receivesTopRows.length ? lastReceiveDate : <span className="metric-loader" aria-label="Loading" />}
+            subtitle="Most recent receive transaction"
+            icon={<TrendingUp className="card-icon" />}
+          />
+          <SummaryCard
+            label="Last PO Date"
+            value={lastPODate ?? <span className="metric-loader" aria-label="Loading" />}
+            subtitle="Most recent purchase order"
+            icon={<FileText className="card-icon" />}
+          />
+          <SummaryCard
+            label="SOH As of Date"
+            value={sohAsOfDate ?? <span className="metric-loader" aria-label="Loading" />}
+            subtitle="UsableStock last sync"
+            icon={<PackageCheck className="card-icon" />}
           />
         </section>
 
