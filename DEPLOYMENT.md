@@ -39,7 +39,16 @@ Then the browser only talks to your own domain; Netlify forwards to Render serve
 
 ### 3) Vercel / other hosts
 
-Add an equivalent rewrite/proxy rule for your host, or use a small serverless function as a proxy, and set `VITE_API_ORIGIN` to that path.
+This repo’s `vercel.json` rewrites `/api/*` to the Render backend.
+
+- **Dashboard on `https://fanos-dashboard.vercel.app`**  
+  Leave `VITE_API_ORIGIN` unset (or `/api`). The browser calls `/api/metadata/...` on the same host.
+
+- **Dashboard embedded on another origin** (e.g. `https://fanos.epss.gov.et/metadata/`)  
+  Set **`VITE_API_ORIGIN=https://fanos-dashboard.vercel.app/api`** (include the **`/api`** suffix).  
+  If you set only `https://fanos-dashboard.vercel.app`, the built URLs become `.../metadata/...` on the Vercel host (static/SPA), not `.../api/metadata/...`, so fetches return HTML and the UI stays on loading.
+
+The app also normalizes a bare `https://*.vercel.app` value (no path) to `https://*.vercel.app/api` at build time. Other hosts must include `/api` in the URL if your proxy uses that prefix.
 
 ## Other gotchas
 
