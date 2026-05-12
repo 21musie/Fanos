@@ -63,6 +63,90 @@ const formatYAxis = (value) => {
   return value.toString()
 }
 
+/** YYYY-MM-DD for summary cards; accepts ISO strings or timestamps. */
+const normalizeSummaryDate = (raw) => {
+  if (raw == null) return null
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    const d = new Date(raw)
+    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10)
+  }
+  const s = String(raw).trim()
+  if (!s) return null
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
+  const d = new Date(s)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10)
+}
+
+const summaryDateFromHoursSince = (hoursSince) => {
+  const hours = Number(hoursSince)
+  if (!Number.isFinite(hours) || hours < 0) return null
+  return new Date(Date.now() - hours * 3600 * 1000).toISOString().slice(0, 10)
+}
+
+/** Handles typical metadata shapes: string, { value }, { lastPODate }, etc. */
+const extractDateFromMetadataPayload = (payload) => {
+  if (payload == null) return null
+  const direct = normalizeSummaryDate(payload)
+  if (direct) return direct
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const found = extractDateFromMetadataPayload(item)
+      if (found) return found
+    }
+    return null
+  }
+  if (typeof payload === 'object') {
+    const preferredKeys = ['lastPODate', 'lastPoDate', 'value', 'date', 'asOfDate', 'snapshotDate']
+    for (const key of preferredKeys) {
+      if (key in payload) {
+        const found = extractDateFromMetadataPayload(payload[key])
+        if (found) return found
+      }
+    }
+    for (const key of Object.keys(payload)) {
+      const found = extractDateFromMetadataPayload(payload[key])
+      if (found) return found
+    }
+  }
+  return null
+}
+
+const parseTransactionTimestamp = (raw) => {
+  if (raw == null) return NaN
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    const d = new Date(raw)
+    return d.getTime()
+  }
+  const s = String(raw).trim()
+  if (!s) return NaN
+  const digits = s.replace(/\D/g, '')
+  if (digits.length >= 8) {
+    const y = digits.slice(0, 4)
+    const m = digits.slice(4, 6)
+    const day = digits.slice(6, 8)
+    const t = Date.parse(`${y}-${m}-${day}T12:00:00`)
+    if (!Number.isNaN(t)) return t
+  }
+  const t = Date.parse(s)
+  return Number.isNaN(t) ? NaN : t
+}
+
+/** e.g. "3 hours ago", "2 days ago" for summary cards */
+const formatRelativeTimeAgo = (raw) => {
+  const ts = parseTransactionTimestamp(raw)
+  if (Number.isNaN(ts)) return null
+  const diffMs = Date.now() - ts
+  if (!Number.isFinite(diffMs)) return null
+  const hours = diffMs / (1000 * 3600)
+  if (hours < 0) return 'Just now'
+  if (hours < 24) {
+    const h = Math.max(1, Math.round(hours))
+    return `${h} hour${h === 1 ? '' : 's'} ago`
+  }
+  const days = Math.max(1, Math.floor(diffMs / (1000 * 3600 * 24)))
+  return `${days} day${days === 1 ? '' : 's'} ago`
+}
+
 const CustomLegend = () => {
   const legendItems = [
     { label: 'Issues', color: '#F4A261' },
@@ -95,6 +179,10 @@ function App() {
   const [issuesTopRows, setIssuesTopRows] = useState([])
   const [receivesTopRows, setReceivesTopRows] = useState([])
   const [lastPODate, setLastPODate] = useState(null)
+  /** `null` = not loaded yet; array (possibly empty) = loaded */
+  const [commodityByTypeRows, setCommodityByTypeRows] = useState(null)
+  const [ownershipByTypeRows, setOwnershipByTypeRows] = useState(null)
+  const [facilityByTypeRawRows, setFacilityByTypeRawRows] = useState(null)
   const [issuesPageLoading, setIssuesPageLoading] = useState(true)
   const [receivesPageLoading, setReceivesPageLoading] = useState(true)
   const [selectedIssuesYear, setSelectedIssuesYear] = useState('2026')
@@ -210,7 +298,9 @@ function App() {
               ? [payload]
               : []
 
-        if (!Array.isArray(rows) || rows.length === 0) {
+        if (isMounted) setCommodityByTypeRows(rows)
+
+        if (rows.length === 0) {
           if (isMounted) {
             setItemSlides([])
             setLoadingMetrics((current) => ({ ...current, items: false }))
@@ -526,10 +616,20 @@ function App() {
             const tone = toSyncTone(row?.hoursSince)
             const hoursSince = Number(row?.hoursSince)
             const syncStatusRaw = String(row?.syncStatus || 'UNKNOWN').toUpperCase()
+            const explicitAsOf =
+              row?.lastSyncDate ??
+              row?.lastSyncedAt ??
+              row?.asOfDate ??
+              row?.snapshotDate ??
+              row?.lastSyncDateTime ??
+              row?.lastSyncTime
+            const asOfDateDisplay =
+              normalizeSummaryDate(explicitAsOf) ?? summaryDateFromHoursSince(row?.hoursSince)
             return {
               module: String(row?.module || 'Unknown').trim(),
               status: toSyncLabel(tone),
               lastSync: formatLastSync(row?.hoursSince),
+              asOfDateDisplay: asOfDateDisplay || null,
               tone,
               syncStatus: syncStatusRaw,
               syncStatusTone: toSyncStatusTone(syncStatusRaw),
@@ -593,6 +693,48 @@ function App() {
       }
     }
 
+    const loadLastPODate = async () => {
+      while (isMounted) {
+        const payload = await fetchJsonWithRetry(apiUrl('/metadata/last-po-date'))
+        if (!payload || !isMounted) return
+        const dateStr = extractDateFromMetadataPayload(payload)
+        if (!dateStr) {
+          await wait(1500)
+          continue
+        }
+        if (isMounted) setLastPODate(dateStr)
+        return
+      }
+    }
+
+    const parseMetadataRows = (payload) => {
+      if (payload == null) return null
+      if (Array.isArray(payload)) return payload
+      if (Array.isArray(payload?.value)) return payload.value
+      return null
+    }
+
+    const loadOverviewDetailTables = async () => {
+      const loadOne = async (path, setter) => {
+        while (isMounted) {
+          const payload = await fetchJsonWithRetry(apiUrl(path))
+          if (!isMounted) return
+          const rows = parseMetadataRows(payload)
+          if (rows === null) {
+            await wait(1500)
+            continue
+          }
+          if (isMounted) setter(rows)
+          return
+        }
+      }
+
+      await Promise.all([
+        loadOne('/metadata/served-facilities/by-ownership-type', setOwnershipByTypeRows),
+        loadOne('/metadata/served-facilities/by-type-raw', setFacilityByTypeRawRows),
+      ])
+    }
+
     // Fire all dashboard API requests immediately while splash screen is visible.
     void Promise.all([
       loadLiveMetrics(),
@@ -605,6 +747,8 @@ function App() {
       loadTransactionsMonthly(),
       loadIssuesTopTen(),
       loadReceivesTopTen(),
+      loadLastPODate(),
+      loadOverviewDetailTables(),
     ])
 
     return () => {
@@ -986,16 +1130,41 @@ function App() {
       )
     }
 
-    const lastIssueDate = issuesTopRows.length
-      ? issuesTopRows.reduce((best, r) => (r.deliveryDate > best ? r.deliveryDate : best), '').slice(0, 10)
+    const lastIssueRaw = issuesTopRows.length
+      ? issuesTopRows.reduce((best, r) => (r.deliveryDate > best ? r.deliveryDate : best), '')
       : null
 
-    const lastReceiveDate = receivesTopRows.length
-      ? receivesTopRows.reduce((best, r) => (r.receiveDate > best ? r.receiveDate : best), '').slice(0, 10)
+    const lastReceiveRaw = receivesTopRows.length
+      ? receivesTopRows.reduce((best, r) => (r.receiveDate > best ? r.receiveDate : best), '')
       : null
+
+    const lastIssueRelative =
+      lastIssueRaw != null && String(lastIssueRaw).trim() !== ''
+        ? formatRelativeTimeAgo(lastIssueRaw) ?? normalizeSummaryDate(lastIssueRaw) ?? String(lastIssueRaw).slice(0, 10)
+        : null
+
+    const lastReceiveRelative =
+      lastReceiveRaw != null && String(lastReceiveRaw).trim() !== ''
+        ? formatRelativeTimeAgo(lastReceiveRaw) ?? normalizeSummaryDate(lastReceiveRaw) ?? String(lastReceiveRaw).slice(0, 10)
+        : null
 
     const sohAsOfDate =
-      syncStatusData.find((m) => m.module.toLowerCase().includes('usablestock'))?.lastSync ?? null
+      syncStatusData.find((m) => m.module.toLowerCase().includes('usablestock'))?.asOfDateDisplay ?? null
+
+    const isOverviewMetaTablesLoading =
+      commodityByTypeRows === null || ownershipByTypeRows === null || facilityByTypeRawRows === null
+
+    const commodityByTypeSorted = commodityByTypeRows
+      ? [...commodityByTypeRows].sort((a, b) => Number(b?.servedItemUnits ?? 0) - Number(a?.servedItemUnits ?? 0))
+      : []
+
+    const ownershipByTypeSorted = ownershipByTypeRows
+      ? [...ownershipByTypeRows].sort((a, b) => Number(b?.servedFacilities ?? 0) - Number(a?.servedFacilities ?? 0))
+      : []
+
+    const facilityByTypeRawSorted = facilityByTypeRawRows
+      ? [...facilityByTypeRawRows].sort((a, b) => Number(b?.servedFacilities ?? 0) - Number(a?.servedFacilities ?? 0))
+      : []
 
     return (
       <>
@@ -1034,13 +1203,13 @@ function App() {
         <section className="summary-grid compact-cards">
           <SummaryCard
             label="Last Issue Date"
-            value={issuesTopRows.length ? lastIssueDate : <span className="metric-loader" aria-label="Loading" />}
+            value={issuesTopRows.length ? lastIssueRelative : <span className="metric-loader" aria-label="Loading" />}
             subtitle="Most recent issue transaction"
             icon={<TrendingDown className="card-icon" />}
           />
           <SummaryCard
             label="Last Receive Date"
-            value={receivesTopRows.length ? lastReceiveDate : <span className="metric-loader" aria-label="Loading" />}
+            value={receivesTopRows.length ? lastReceiveRelative : <span className="metric-loader" aria-label="Loading" />}
             subtitle="Most recent receive transaction"
             icon={<TrendingUp className="card-icon" />}
           />
@@ -1053,7 +1222,7 @@ function App() {
           <SummaryCard
             label="SOH As of Date"
             value={sohAsOfDate ?? <span className="metric-loader" aria-label="Loading" />}
-            subtitle="UsableStock last sync"
+            subtitle="UsableStock snapshot as of this date"
             icon={<PackageCheck className="card-icon" />}
           />
         </section>
@@ -1100,6 +1269,133 @@ function App() {
             </div>
             <CustomLegend />
           </article>
+
+          {isOverviewMetaTablesLoading ? (
+            <div className="donut-loader-wrap">
+              <span className="donut-loader" aria-label="Loading overview data tables" />
+            </div>
+          ) : (
+            <>
+              <article className="panel">
+                <h2>Served item units by commodity type</h2>
+                <p className="panel-subtitle">Distinct item units served, grouped by SAP commodity type</p>
+                <div className="issues-table-card">
+                  <div className="issues-table-header">
+                    <h3>By commodity type</h3>
+                    <span>All rows</span>
+                  </div>
+                  <div className="issues-table-scroll">
+                    <table className="issues-table">
+                      <thead>
+                        <tr>
+                          <th>Code</th>
+                          <th>Commodity type</th>
+                          <th>Served item units</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {commodityByTypeSorted.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="issues-empty-row">No records available</td>
+                          </tr>
+                        ) : (
+                          commodityByTypeSorted.map((row, idx) => (
+                            <tr key={`${String(row?.commodityTypeCode ?? 'row')}-${idx}`}>
+                              <td>{row?.commodityTypeCode || '-'}</td>
+                              <td>{row?.commodityType || '-'}</td>
+                              <td>
+                                {Number.isFinite(Number(row?.servedItemUnits))
+                                  ? Number(row.servedItemUnits).toLocaleString()
+                                  : '-'}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </article>
+
+              <article className="panel">
+                <h2>Served facilities by ownership type</h2>
+                <p className="panel-subtitle">Facilities grouped by ownership classification</p>
+                <div className="issues-table-card">
+                  <div className="issues-table-header">
+                    <h3>By ownership</h3>
+                    <span>All rows</span>
+                  </div>
+                  <div className="issues-table-scroll">
+                    <table className="issues-table">
+                      <thead>
+                        <tr>
+                          <th>Ownership type</th>
+                          <th>Served facilities</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ownershipByTypeSorted.length === 0 ? (
+                          <tr>
+                            <td colSpan={2} className="issues-empty-row">No records available</td>
+                          </tr>
+                        ) : (
+                          ownershipByTypeSorted.map((row, idx) => (
+                            <tr key={`${String(row?.ownershipType ?? 'row')}-${idx}`}>
+                              <td>{row?.ownershipType || '-'}</td>
+                              <td>
+                                {Number.isFinite(Number(row?.servedFacilities))
+                                  ? Number(row.servedFacilities).toLocaleString()
+                                  : '-'}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </article>
+
+              <article className="panel">
+                <h2>Served facilities by facility type (raw)</h2>
+                <p className="panel-subtitle">Facilities grouped by raw SAP customer type</p>
+                <div className="issues-table-card">
+                  <div className="issues-table-header">
+                    <h3>By customer type (raw)</h3>
+                    <span>All rows</span>
+                  </div>
+                  <div className="issues-table-scroll">
+                    <table className="issues-table">
+                      <thead>
+                        <tr>
+                          <th>Customer type</th>
+                          <th>Served facilities</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {facilityByTypeRawSorted.length === 0 ? (
+                          <tr>
+                            <td colSpan={2} className="issues-empty-row">No records available</td>
+                          </tr>
+                        ) : (
+                          facilityByTypeRawSorted.map((row, idx) => (
+                            <tr key={`${String(row?.customerType ?? 'row')}-${idx}`}>
+                              <td>{row?.customerType || '-'}</td>
+                              <td>
+                                {Number.isFinite(Number(row?.servedFacilities))
+                                  ? Number(row.servedFacilities).toLocaleString()
+                                  : '-'}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </article>
+            </>
+          )}
 
           <article className="panel">
             <h2>SAP Data Sync Status</h2>

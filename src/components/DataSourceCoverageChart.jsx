@@ -106,7 +106,7 @@ function DataSourceCoverageChart({ data = [] }) {
           layout="vertical"
           margin={{ top: 24, right: 18, left: 38, bottom: 4 }}
           barCategoryGap={8}
-          barSize={22}
+          barSize={36}
         >
           <defs>
             <pattern id="coverage-gap-slash" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
