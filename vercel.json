@@ -3,6 +3,14 @@
     {
       "source": "/api/:path*",
       "destination": "https://epss-pod-verification-be.onrender.com/:path*"
+    },
+    {
+      "source": "/metadata/:path*",
+      "destination": "/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
