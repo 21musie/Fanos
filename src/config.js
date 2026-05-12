@@ -1,19 +1,24 @@
 /**
  * API origin for metadata endpoints.
  *
- * - Local dev: defaults to `/api` so Vite can proxy to Render (avoids browser CORS during development).
- * - Production on Vercel: defaults to `/api` (same-origin; vercel.json rewrites to Render).
- * - Cross-origin from another site: set `VITE_API_ORIGIN` to the **Vercel app URL including `/api`**, e.g.
- *   `https://fanos-dashboard.vercel.app/api`
- *   (If you set only the site root without `/api`, requests hit `/metadata/...` on the app and never reach the proxy.
- *   Bare `https://*.vercel.app` is normalized to add `/api` at build time.)
+ * - Local dev: defaults to `/api` (Vite proxy to Render).
+ * - Production on Vercel: defaults to `/api` (same-origin; vercel.json rewrites).
+ * - Embedded on **fanos.epss.gov.et** (or other `*.epss.gov.et`): when `VITE_API_ORIGIN` is unset,
+ *   requests go to `https://fanos-dashboard.vercel.app/api` so data loads even if the gov proxy
+ *   only forwards `/metadata/` and not `/api/`.
+ * - Override any of the above: set `VITE_API_ORIGIN` (see .env.example).
+ * - On epss.gov.et only: optional `VITE_EPSS_API_PROXY_ORIGIN` to change the default Vercel proxy base.
  *
- * - Direct to Render (only if backend CORS allows your browser origin):
- *   `https://epss-pod-verification-be.onrender.com` (no `/api` segment; paths are `/metadata/...` on that host)
+ * Direct to Render (only if backend CORS allows your browser origin):
+ * `https://epss-pod-verification-be.onrender.com`
  *
- * If live data works locally but not after deploy, see DEPLOYMENT.md (CORS / proxy).
+ * See DEPLOYMENT.md for CORS / proxy notes.
  */
 const fromEnv = import.meta.env.VITE_API_ORIGIN?.trim().replace(/\/$/, '')
+
+/** Optional: proxy used when the app is opened on epss.gov.et and env is unset */
+const epssProxyDefault = 'https://fanos-dashboard.vercel.app/api'
+const epssProxyFromEnv = import.meta.env.VITE_EPSS_API_PROXY_ORIGIN?.trim().replace(/\/$/, '')
 
 /**
  * @param {string} raw
@@ -30,13 +35,10 @@ function normalizeApiOrigin(raw) {
     const u = new URL(raw)
     const path = (u.pathname || '/').replace(/\/$/, '') || '/'
 
-    // Render backend: paths are served at host root (e.g. /metadata/...), not under /api
     if (u.hostname.includes('onrender.com')) {
       return path === '/' ? u.origin : `${u.origin}${path}`
     }
 
-    // Vite / Vercel preview: bare deployment URL without /api is a common misconfiguration;
-    // requests must hit /api/metadata/... not /metadata/... on the app host.
     if (path === '/' && u.hostname.endsWith('.vercel.app')) {
       return `${u.origin}/api`
     }
@@ -47,9 +49,31 @@ function normalizeApiOrigin(raw) {
   }
 }
 
-export const API_ORIGIN = normalizeApiOrigin(fromEnv || '')
+function isEpssGovHost() {
+  if (typeof window === 'undefined') return false
+  const h = window.location.hostname
+  return h === 'fanos.epss.gov.et' || h.endsWith('.epss.gov.et')
+}
+
+function resolveApiOrigin() {
+  // Government embed: same build often has VITE_API_ORIGIN=/api for Vercel, but /api is not
+  // proxied on epss.gov.et — only use env here if it is an absolute URL (explicit override).
+  if (isEpssGovHost()) {
+    if (fromEnv && /^https?:\/\//i.test(fromEnv)) {
+      return normalizeApiOrigin(fromEnv)
+    }
+    return normalizeApiOrigin(epssProxyFromEnv || epssProxyDefault)
+  }
+
+  if (fromEnv) return normalizeApiOrigin(fromEnv)
+  return '/api'
+}
+
+export function getApiOrigin() {
+  return resolveApiOrigin()
+}
 
 export function apiUrl(path) {
   const p = path.startsWith('/') ? path : `/${path}`
-  return `${API_ORIGIN}${p}`
+  return `${resolveApiOrigin()}${p}`
 }

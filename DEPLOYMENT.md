@@ -44,11 +44,17 @@ This repo’s `vercel.json` rewrites `/api/*` to the Render backend.
 - **Dashboard on `https://fanos-dashboard.vercel.app`**  
   Leave `VITE_API_ORIGIN` unset (or `/api`). The browser calls `/api/metadata/...` on the same host.
 
-- **Dashboard embedded on another origin** (e.g. `https://fanos.epss.gov.et/metadata/`)  
-  Set **`VITE_API_ORIGIN=https://fanos-dashboard.vercel.app/api`** (include the **`/api`** suffix).  
-  If you set only `https://fanos-dashboard.vercel.app`, the built URLs become `.../metadata/...` on the Vercel host (static/SPA), not `.../api/metadata/...`, so fetches return HTML and the UI stays on loading.
+- **Dashboard embedded on `https://fanos.epss.gov.et/metadata/` (or any `*.epss.gov.et`)**  
+  The reverse proxy often forwards **`/metadata/`** to Vercel but not **`/api/`**, so relative `/api` calls would hit the government host and fail.  
+  **No env var is required:** at runtime the app calls **`https://fanos-dashboard.vercel.app/api/...`** instead (CORS is allowed on that proxy).  
+  Optional: **`VITE_EPSS_API_PROXY_ORIGIN`** to use a different proxy base.  
+  If you later proxy **`https://fanos.epss.gov.et/api/`** to Vercel yourself, set **`VITE_API_ORIGIN=https://fanos.epss.gov.et/api`** (absolute URL) so the app uses your domain.
 
-The app also normalizes a bare `https://*.vercel.app` value (no path) to `https://*.vercel.app/api` at build time. Other hosts must include `/api` in the URL if your proxy uses that prefix.
+- **Other embedded origins**  
+  Set **`VITE_API_ORIGIN=https://fanos-dashboard.vercel.app/api`** (include **`/api`**).  
+  If you set only `https://fanos-dashboard.vercel.app`, the built URLs hit `/metadata/...` on the app host instead of the API proxy.
+
+The app also normalizes a bare `https://*.vercel.app` value (no path) to `https://*.vercel.app/api` at build time when that value is used as `VITE_API_ORIGIN`.
 
 ## Other gotchas
 
