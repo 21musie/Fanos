@@ -179,6 +179,7 @@ function App() {
   const [issuesTopRows, setIssuesTopRows] = useState([])
   const [receivesTopRows, setReceivesTopRows] = useState([])
   const [lastPODate, setLastPODate] = useState(null)
+  const [hubTransactionData, setHubTransactionData] = useState([])
   /** `null` = not loaded yet; array (possibly empty) = loaded */
   const [commodityByTypeRows, setCommodityByTypeRows] = useState(null)
   const [ownershipByTypeRows, setOwnershipByTypeRows] = useState(null)
@@ -714,6 +715,20 @@ function App() {
       return null
     }
 
+    const loadTransactionsByHub = async () => {
+      while (isMounted) {
+        const payload = await fetchJsonWithRetry(apiUrl('/metadata/transactions/by-hub'))
+        if (!payload || !isMounted) return
+        const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.value) ? payload.value : []
+        if (rows.length === 0) {
+          await wait(1500)
+          continue
+        }
+        if (isMounted) setHubTransactionData(rows)
+        return
+      }
+    }
+
     const loadOverviewDetailTables = async () => {
       const loadOne = async (path, setter) => {
         while (isMounted) {
@@ -748,6 +763,7 @@ function App() {
       loadIssuesTopTen(),
       loadReceivesTopTen(),
       loadLastPODate(),
+      loadTransactionsByHub(),
       loadOverviewDetailTables(),
     ])
 
@@ -1235,7 +1251,7 @@ function App() {
           </article>
 
           <section className="dual-panel-grid">
-            <HubMapCard />
+            <HubMapCard data={hubTransactionData} />
 
             <article className="panel">
               <h2>Health facilities served by type</h2>
