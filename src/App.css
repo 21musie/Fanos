@@ -896,6 +896,21 @@
   padding: 16px 12px;
 }
 
+.overview-tables-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.overview-tables-grid .issues-table {
+  min-width: 0;
+}
+
+.overview-table-scroll-capped {
+  max-height: 215px;
+  overflow-y: auto;
+}
+
 .map-placeholder {
   position: relative;
   width: 100%;
@@ -1046,6 +1061,10 @@
   }
 
   .dual-panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .overview-tables-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -90,7 +90,7 @@ function ModuleTransactionDonut({ data, formatValue }) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={360}>
+    <ResponsiveContainer width="100%" height={420}>
       <PieChart>
         <Pie
           data={data}
@@ -98,7 +98,7 @@ function ModuleTransactionDonut({ data, formatValue }) {
           cy="50%"
           labelLine={false}
           label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-          outerRadius={130}
+          outerRadius={160}
           innerRadius={0}
           paddingAngle={2}
           cornerRadius={3}

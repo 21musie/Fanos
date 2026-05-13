@@ -32,17 +32,18 @@ const defaultModuleTransactionData = [
 ]
 
 const defaultTransactionVolumeData = [
-  { year: '2015', Issues: 80000, Receive: 75000 },
-  { year: '2016', Issues: 95000, Receive: 88000 },
-  { year: '2017', Issues: 110000, Receive: 105000 },
-  { year: '2018', Issues: 145000, Receive: 138000 },
-  { year: '2019', Issues: 180000, Receive: 165000 },
-  { year: '2020', Issues: 95000, Receive: 82000 },
-  { year: '2021', Issues: 195000, Receive: 185000 },
-  { year: '2022', Issues: 225000, Receive: 210000 },
-  { year: '2023', Issues: 250000, Receive: 235000 },
-  { year: '2024', Issues: 275000, Receive: 258000 },
-  { year: '2025', Issues: 285000, Receive: 268000 },
+  { year: '2015', Issues: 444043, Receive: 71286 },
+  { year: '2016', Issues: 1141825, Receive: 136226 },
+  { year: '2017', Issues: 1190013, Receive: 140593 },
+  { year: '2018', Issues: 1254942, Receive: 141511 },
+  { year: '2019', Issues: 1387292, Receive: 168641 },
+  { year: '2020', Issues: 1331113, Receive: 170985 },
+  { year: '2021', Issues: 1436872, Receive: 172628 },
+  { year: '2022', Issues: 1588266, Receive: 159550 },
+  { year: '2023', Issues: 1816818, Receive: 202564 },
+  { year: '2024', Issues: 1776502, Receive: 249482 },
+  { year: '2025', Issues: 2082783, Receive: 230049 },
+  { year: '2026', Issues: 781694, Receive: 86736 },
 ]
 
 const defaultSyncStatusData = [
@@ -53,8 +54,8 @@ const defaultSyncStatusData = [
 ]
 
 const defaultCoverageData = [
-  { module: 'Issues', offset: 0, vitas: 12, gap: 0, sap: 2 },
-  { module: 'Receive', offset: 2, vitas: 10, gap: 0, sap: 2 },
+  { module: 'Issues', offset: 3, vitas: 9, gap: 0, sap: 2 },
+  { module: 'Receive', offset: 3, vitas: 9, gap: 0, sap: 2 },
 ]
 
 const formatYAxis = (value) => {
@@ -1231,13 +1232,13 @@ function App() {
           />
           <SummaryCard
             label="Last PO Date"
-            value={lastPODate ?? <span className="metric-loader" aria-label="Loading" />}
+            value={lastPODate ? (formatRelativeTimeAgo(lastPODate) ?? lastPODate) : <span className="metric-loader" aria-label="Loading" />}
             subtitle="Most recent purchase order"
             icon={<FileText className="card-icon" />}
           />
           <SummaryCard
             label="SOH As of Date"
-            value={sohAsOfDate ?? <span className="metric-loader" aria-label="Loading" />}
+            value={sohAsOfDate ? (formatRelativeTimeAgo(sohAsOfDate) ?? sohAsOfDate) : <span className="metric-loader" aria-label="Loading" />}
             subtitle="UsableStock snapshot as of this date"
             icon={<PackageCheck className="card-icon" />}
           />
@@ -1291,7 +1292,7 @@ function App() {
               <span className="donut-loader" aria-label="Loading overview data tables" />
             </div>
           ) : (
-            <>
+            <section className="overview-tables-grid">
               <article className="panel">
                 <h2>Served item units by commodity type</h2>
                 <p className="panel-subtitle">Distinct item units served, grouped by SAP commodity type</p>
@@ -1300,7 +1301,7 @@ function App() {
                     <h3>By commodity type</h3>
                     <span>All rows</span>
                   </div>
-                  <div className="issues-table-scroll">
+                  <div className="issues-table-scroll overview-table-scroll-capped">
                     <table className="issues-table">
                       <thead>
                         <tr>
@@ -1341,7 +1342,7 @@ function App() {
                     <h3>By ownership</h3>
                     <span>All rows</span>
                   </div>
-                  <div className="issues-table-scroll">
+                  <div className="issues-table-scroll overview-table-scroll-capped">
                     <table className="issues-table">
                       <thead>
                         <tr>
@@ -1380,7 +1381,7 @@ function App() {
                     <h3>By customer type (raw)</h3>
                     <span>All rows</span>
                   </div>
-                  <div className="issues-table-scroll">
+                  <div className="issues-table-scroll overview-table-scroll-capped">
                     <table className="issues-table">
                       <thead>
                         <tr>
@@ -1410,7 +1411,7 @@ function App() {
                   </div>
                 </div>
               </article>
-            </>
+            </section>
           )}
 
           <article className="panel">
